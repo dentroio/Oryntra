@@ -1,0 +1,70 @@
+# Oryntra project configuration
+# Copy to oryntra.yaml in your app workspace root.
+
+project:
+  name: my-app
+  root: .
+
+app:
+  url: http://localhost:3000
+  devCommand: npm run dev
+  healthCheckUrl: http://localhost:3000
+
+ide:
+  preferred: cursor
+  openDiffsInIde: true
+
+review:
+  # Spatial capture on feedback submit
+  captureScreenshot: true
+  captureAccessibilitySnapshot: true
+  mouseSampleIntervalMs: 100
+  recentEventWindowSeconds: 60
+  recentEventMaxCount: 5
+
+agent:
+  # Review facilitator (Oryntra-side conversation)
+  facilitatorProvider: stub  # stub | openai | anthropic
+  # Execution agent (IDE-side implementation) — Phase 4+
+  executionProvider: cursor
+
+browser:
+  headless: false
+  viewport:
+    width: 1280
+    height: 800
+  captureConsole: true
+  captureNetwork: true
+
+artifacts:
+  # Types the facilitator may draft from feedback
+  enabled:
+    - change_request
+    - work_order
+    - doc_update
+    - architecture_update
+
+tests:
+  testCommand: npm test
+  lintCommand: npm run lint
+  e2eCommand: npx playwright test
+
+security:
+  workspaceOnly: true
+  localhostOnly: true
+  requireApprovalBeforePatch: true
+  requireApprovalBeforeShell: true
+  redactSecrets: true
+  allowPublicTunnel: false
+  commandAllowlist:
+    - npm run dev
+    - npm run build
+    - npm test
+    - npm run test
+    - npm run lint
+    - pnpm dev
+    - pnpm build
+    - pnpm test
+    - pnpm lint
+    - yarn dev
+    - bun run dev
