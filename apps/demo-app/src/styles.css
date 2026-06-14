@@ -1,0 +1,382 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: #f4f6fa;
+  color: #1a1f2c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: #2f5fa8;
+  text-decoration: none;
+}
+
+a.active {
+  font-weight: 600;
+  color: #173e7a;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: #fff;
+  border-bottom: 1px solid #dde3ee;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.nav {
+  display: flex;
+  gap: 18px;
+}
+
+.content {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.page h1 {
+  margin: 0 0 8px;
+  font-size: 1.6rem;
+}
+
+.lede {
+  color: #5a6478;
+  max-width: 60ch;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  padding: 18px;
+  color: inherit;
+}
+
+.card:hover {
+  border-color: #9bb8e8;
+}
+
+.filters {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #5a6478;
+}
+
+select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #c8d2e4;
+  background: #fff;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid #eef2f8;
+}
+
+.data-table th {
+  background: #f8fafc;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a6478;
+}
+
+button {
+  background: #2f5fa8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+button.secondary {
+  background: #e8eef8;
+  color: #2f5fa8;
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+
+.pill-online {
+  background: #e4f7ec;
+  color: #1b7a42;
+}
+
+.pill-offline {
+  background: #fdeaea;
+  color: #b42318;
+}
+
+.pill-maintenance {
+  background: #fff4e5;
+  color: #b54708;
+}
+
+.detail-card {
+  background: #fff;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 12px;
+}
+
+.detail-card dl {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 8px 16px;
+}
+
+.detail-card dt {
+  color: #5a6478;
+  font-size: 0.85rem;
+}
+
+.muted {
+  color: #5a6478;
+  margin-top: 16px;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 100;
+}
+
+.drawer-panel {
+  width: min(420px, 92vw);
+  height: 100%;
+  background: #fff;
+  border-left: 1px solid #dde3ee;
+  padding: 20px;
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.12);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.drawer-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.detail-dl {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px 16px;
+}
+
+.detail-dl dt {
+  color: #5a6478;
+  font-size: 0.85rem;
+}
+
+.breadcrumb {
+  font-size: 0.9rem;
+  color: #5a6478;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 360px;
+  background: #fff;
+  border: 1px solid #dde3ee;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.settings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.settings-form .checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.save-ok {
+  color: #1b7a42;
+  font-size: 0.9rem;
+}
+
+/* Dark mode — applied via data-theme on <html> */
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="dark"] :root,
+[data-theme="dark"] body {
+  background: #0f1419;
+  color: #e8eaed;
+}
+
+[data-theme="dark"] .topbar,
+[data-theme="dark"] .page-header,
+[data-theme="dark"] .detail-card,
+[data-theme="dark"] .settings-form,
+[data-theme="dark"] .drawer-panel,
+[data-theme="dark"] .card {
+  background: #1a2030;
+  border-color: #2a3344;
+  color: #e8eaed;
+}
+
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .data-table td {
+  border-color: #2a3344;
+}
+
+[data-theme="dark"] .muted,
+[data-theme="dark"] .breadcrumb,
+[data-theme="dark"] .detail-dl dt {
+  color: #9aa3b5;
+}
+
+[data-theme="dark"] a {
+  color: #9cc4ff;
+}
+
+[data-theme="dark"] .drawer-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+/* devices-dark-polish */
+[data-theme="dark"] .filters label {
+  color: #9aa3b5;
+}
+
+[data-theme="dark"] select {
+  background: #1a2030;
+  border-color: #2a3344;
+  color: #e8eaed;
+}
+
+[data-theme="dark"] .data-table {
+  background: #1a2030;
+  border-color: #2a3344;
+}
+
+[data-theme="dark"] .data-table th {
+  background: #141a24;
+  color: #9aa3b5;
+}
+
+[data-theme="dark"] .data-table td {
+  color: #e8eaed;
+  border-bottom-color: #2a3344;
+}
+
+[data-theme="dark"] button.secondary {
+  background: #243a62;
+  color: #9cc4ff;
+}
+
+[data-theme="dark"] .theme-toggle {
+  background: #243a62;
+  color: #9cc4ff;
+  margin-left: 8px;
+  font-size: 0.8rem;
+  padding: 6px 10px;
+}
+
+[data-theme="dark"] .pill-online {
+  background: #1a3d2a;
+  color: #7dcea0;
+}
+
+[data-theme="dark"] .pill-offline {
+  background: #3d1a1a;
+  color: #f5a8a8;
+}
+
+[data-theme="dark"] .pill-maintenance {
+  background: #3d2e14;
+  color: #e8c27a;
+}
+
+/* locations-page */
+.location-list {
+  margin: 16px 0 0;
+  padding-left: 1.2rem;
+  color: #5a6478;
+}
+
+.location-list li {
+  margin: 8px 0;
+}

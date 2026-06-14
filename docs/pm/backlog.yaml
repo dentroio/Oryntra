@@ -1,0 +1,398 @@
+# Oryntra project backlog — canonical source for features & requirements.
+# Update status here; run `npm run pm:report` for a summary.
+#
+# Status: proposed | planned | in_progress | blocked | done | deferred | cancelled
+# Priority: critical | high | medium | low
+
+meta:
+  project: Oryntra
+  spec_version: "1.2"
+  last_updated: "2026-06-12"
+  owner: Cursor agent + Steven Gerhart
+
+requirements:
+  - id: REQ-001
+    title: Spatial review session
+    description: User navigates a real browser; Oryntra captures clicks, route, mouse, and feedback moments.
+    status: done
+    phase: 1
+    acceptance:
+      - Playwright-attached Chromium opens at app URL
+      - Review Room shows session status, route, and element context
+      - Click, navigation, console, and network events stream to UI
+    features: [FEAT-001, FEAT-002, FEAT-003]
+
+  - id: REQ-002
+    title: Feedback capture with spatial bundle
+    description: Typed (or voice) feedback creates a FeedbackMoment with screenshot and spatial context.
+    status: done
+    phase: 1
+    acceptance:
+      - Submit feedback captures mouse, element, screenshot, a11y snapshot
+      - Moments persist in SQLite; screenshots on disk
+    features: [FEAT-004, FEAT-005]
+
+  - id: REQ-003
+    title: Review facilitator and artifacts
+    description: Agent interprets feedback and drafts change requests / work orders for approval.
+    status: done
+    phase: 3
+    acceptance:
+      - Facilitator returns interpretation and summary
+      - User can approve or reject proposed change requests in Review Room
+    features: [FEAT-006, FEAT-007, FEAT-008]
+
+  - id: REQ-004
+    title: IDE handoff via MCP
+    description: Cursor agent can list sessions, read artifacts, and implement approved changes in workspace.
+    status: done
+    phase: 4
+    acceptance:
+      - MCP server exposes session and artifact tools
+      - collaborate_now starts review without manual npm steps
+      - Review history syncs to workspace markdown for Cursor
+    features: [FEAT-009, FEAT-010, FEAT-011, FEAT-012]
+
+  - id: REQ-005
+    title: Execution loop in workspace
+    description: Approved artifacts drive implementation in git worktree or workspace with visible progress.
+    status: done
+    phase: 5
+    acceptance:
+      - Approve triggers implement request and agent run
+      - User sees implementation steps / Done in Review Room
+      - Stale implement state does not block new sessions
+    features: [FEAT-013, FEAT-014, FEAT-015, FEAT-016]
+
+  - id: REQ-006
+    title: Visual evidence in review UX
+    description: Reviewer sees what was captured — screenshots and highlights — not only chat text.
+    status: done
+    phase: 2
+    acceptance:
+      - Screenshot thumbnail appears in chat after Send
+      - Element highlight shown when Pick element / Explain click used
+      - Optional manual Snap before typing
+    features: [FEAT-017, FEAT-018, FEAT-019]
+
+  - id: REQ-007
+    title: Region / area feedback
+    description: User can mark an arbitrary screen region when feedback is not a single DOM element.
+    status: proposed
+    phase: 2
+    acceptance:
+      - Marquee drag on app preview attaches crop + coordinates to feedback moment
+      - Region visible in evidence panel and review history
+    features: [FEAT-020]
+
+  - id: REQ-008
+    title: Voice input
+    description: Push-to-talk STT creates feedback moments with same spatial bundle as typed input.
+    status: proposed
+    phase: 6
+    acceptance:
+      - Mic in Review Room produces transcript + spatial moment
+    features: [FEAT-021]
+
+  - id: REQ-009
+    title: Automated verification
+    description: Playwright tests and before/after screenshots validate approved changes.
+    status: proposed
+    phase: 7
+    acceptance:
+      - verify_behavior MCP tool runs against acceptance criteria
+    features: [FEAT-022]
+
+  - id: REQ-010
+    title: Enterprise single-screen review (browser extension)
+    description: App in normal tab; Review Studio in side panel; authenticated capture.
+    status: done
+    phase: 6
+    acceptance:
+      - Extension captures spatial context from app tab
+      - captureVisibleTab on feedback
+      - No second browser window
+    features: [FEAT-025, FEAT-026, FEAT-027]
+
+  - id: REQ-011
+    title: Multi-IDE detection and handoff routing
+    description: Discover Cursor, VS Code, and other IDEs; route handoff to preferred IDE.
+    status: done
+    phase: 6
+    acceptance:
+      - MCP heartbeat registers IDE connections
+      - GET /api/ide/available lists IDEs
+      - Session preferredIde selects handoff target
+    features: [FEAT-028, FEAT-029, FEAT-030]
+
+features:
+  # Phase 1 — Spatial review room
+  - id: FEAT-001
+    title: Monorepo and core types
+    status: done
+    priority: critical
+    phase: 1
+    requirements: [REQ-001]
+    packages: [core, cli, server]
+
+  - id: FEAT-002
+    title: Browser service (Playwright capture)
+    status: done
+    priority: critical
+    phase: 1
+    requirements: [REQ-001]
+    packages: [browser-service]
+
+  - id: FEAT-003
+    title: Review Room SPA (session UI)
+    status: done
+    priority: critical
+    phase: 1
+    requirements: [REQ-001]
+    packages: [review-room]
+
+  - id: FEAT-004
+    title: Feedback moments + SQLite persistence
+    status: done
+    priority: critical
+    phase: 1
+    requirements: [REQ-002]
+    packages: [server, core]
+
+  - id: FEAT-005
+    title: Screenshot + a11y snapshot on feedback submit
+    status: done
+    priority: high
+    phase: 2
+    requirements: [REQ-002]
+    notes: Captured server-side; not yet shown in main chat UI (see FEAT-017).
+
+  # Phase 2 — Rich observation
+  - id: FEAT-006
+    title: Explain click and Pick element modes
+    status: done
+    priority: high
+    phase: 2
+    requirements: [REQ-001, REQ-002]
+    packages: [browser-service, review-room, server]
+
+  - id: FEAT-017
+    title: Show screenshot in chat after Send
+    status: done
+    priority: high
+    phase: 2
+    requirements: [REQ-006]
+    packages: [review-room]
+    notes: FeedbackEvidence component exists but is not wired into SessionPage.
+
+  - id: FEAT-018
+    title: Element highlight on feedback evidence
+    status: done
+    priority: high
+    phase: 2
+    requirements: [REQ-006]
+    packages: [review-room]
+
+  - id: FEAT-019
+    title: Manual Snap button (capture without sending)
+    status: done
+    priority: medium
+    phase: 2
+    requirements: [REQ-006]
+    packages: [review-room, server]
+
+  - id: FEAT-020
+    title: Region marquee selection on app preview
+    status: proposed
+    priority: medium
+    phase: 2
+    requirements: [REQ-007]
+    packages: [review-room, browser-service]
+
+  # Phase 3 — Facilitator
+  - id: FEAT-007
+    title: Stub + OpenAI facilitators
+    status: done
+    priority: high
+    phase: 3
+    requirements: [REQ-003]
+    packages: [facilitator]
+
+  - id: FEAT-008
+    title: Approve / reject change requests in chat
+    status: done
+    priority: high
+    phase: 3
+    requirements: [REQ-003]
+    packages: [review-room, server]
+
+  # Phase 4 — IDE handoff
+  - id: FEAT-009
+    title: MCP server (stdio)
+    status: done
+    priority: critical
+    phase: 4
+    requirements: [REQ-004]
+    packages: [mcp]
+
+  - id: FEAT-010
+    title: collaborate_now + demo dev auto-start
+    status: done
+    priority: high
+    phase: 4
+    requirements: [REQ-004]
+    packages: [mcp, cli]
+
+  - id: FEAT-011
+    title: Workspace review-history.md sync
+    status: done
+    priority: high
+    phase: 4
+    requirements: [REQ-004]
+    packages: [server]
+
+  - id: FEAT-012
+    title: Cursor agent bridge (continue vs new agent on approve)
+    status: done
+    priority: high
+    phase: 4
+    requirements: [REQ-004]
+    packages: [server, cli, review-room]
+
+  # Phase 5 — Execution
+  - id: FEAT-013
+    title: Git worktree + execution plan
+    status: done
+    priority: high
+    phase: 5
+    requirements: [REQ-005]
+    packages: [workspace]
+
+  - id: FEAT-014
+    title: implement-request.json + implement status API
+    status: done
+    priority: high
+    phase: 5
+    requirements: [REQ-005]
+    packages: [server, review-room]
+
+  - id: FEAT-015
+    title: propose_patch / apply_patch in worktree
+    status: done
+    priority: high
+    phase: 5
+    requirements: [REQ-005]
+    packages: [workspace, mcp]
+
+  - id: FEAT-016
+    title: Ignore stale implement-request from other sessions
+    status: done
+    priority: medium
+    phase: 5
+    requirements: [REQ-005]
+    packages: [server]
+    notes: getImplementStatus returns none when sessionId mismatches.
+
+  # UX / polish (cross-cutting)
+  - id: FEAT-023
+    title: Review Studio dark-mode app preview frame
+    status: done
+    priority: medium
+    phase: 2
+    requirements: []
+    packages: [review-room]
+    notes: Preview stage + label above iframe so dark app does not blend into chrome.
+
+  - id: FEAT-024
+    title: Iframe bridge capture for embedded demo app
+    status: done
+    priority: high
+    phase: 1
+    requirements: [REQ-001]
+    packages: [browser-service]
+    notes: Demo runs in iframe; bridge-session reports clicks to server.
+
+  # Phase 6–7
+  - id: FEAT-021
+    title: Push-to-talk voice feedback
+    status: proposed
+    priority: medium
+    phase: 6
+    requirements: [REQ-008]
+    packages: [review-room]
+    notes: Mic button exists; full STT pipeline pending.
+
+  - id: FEAT-022
+    title: Playwright verification + acceptance checklist
+    status: proposed
+    priority: medium
+    phase: 7
+    requirements: [REQ-009]
+    packages: [mcp, workspace]
+
+  - id: FEAT-025
+    title: Chrome extension MV3 package
+    status: done
+    priority: critical
+    phase: 6
+    requirements: [REQ-010]
+    packages: [browser-extension]
+    notes: Side panel, content script, captureVisibleTab, options page.
+
+  - id: FEAT-026
+    title: Extension capture mode on backend
+    status: done
+    priority: critical
+    phase: 6
+    requirements: [REQ-010]
+    packages: [browser-service, server, review-room]
+    notes: captureMode extension; BridgeSession; sidepanel layout.
+
+  - id: FEAT-027
+    title: Embedded bridge authenticated capture
+    status: done
+    priority: high
+    phase: 6
+    requirements: [REQ-010]
+    packages: [server, browser-service]
+    notes: Bridge capture coordinator + html2canvas fallback for embedded.
+
+  - id: FEAT-028
+    title: IDE Registry + heartbeat API
+    status: done
+    priority: high
+    phase: 6
+    requirements: [REQ-011]
+    packages: [server, core, mcp]
+    notes: POST /api/ide/heartbeat; GET available/connected; local probe.
+
+  - id: FEAT-029
+    title: Extension IDE status chips
+    status: done
+    priority: medium
+    phase: 6
+    requirements: [REQ-011]
+    packages: [browser-extension]
+    notes: Side panel shows connected MCP IDEs.
+
+  - id: FEAT-030
+    title: Session preferredIde routing
+    status: done
+    priority: medium
+    phase: 6
+    requirements: [REQ-011]
+    packages: [server, facilitator, mcp, browser-extension]
+    notes: Handoff/implement respects preferredIde; MCP filters wrong IDE; extension chips selectable.
+
+sprints:
+  - id: SPRINT-2026-06-12
+    title: Browser extension + multi-IDE registry
+    status: done
+    goal: Enterprise single-screen review for Clarion; detect Cursor + VS Code
+    features: [FEAT-025, FEAT-026, FEAT-027, FEAT-028, FEAT-029, FEAT-030]
+
+  - id: SPRINT-2026-06-11
+    title: Execution loop + review UX evidence
+    status: active
+    goal: Close Phase 5 dogfood loop; surface screenshots in Review Room
+    features: [FEAT-013, FEAT-014, FEAT-015, FEAT-017, FEAT-018]

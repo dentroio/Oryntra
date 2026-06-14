@@ -1,0 +1,32 @@
+project:
+  name: clarion-demo
+  root: .
+
+app:
+  url: http://127.0.0.1:4318
+  devCommand: npm run dev
+  healthCheckUrl: http://127.0.0.1:4318
+
+ide:
+  preferred: cursor
+
+agent:
+  # IDE Agent + MCP (uses your Cursor login — not headless CLI)
+  facilitatorProvider: ide
+  autoImplementOnApprove: true
+  implementInWorkspace: true
+  cursorAgent: true
+  openCursorAgentOnCollaborate: true
+
+browser:
+  mode: embedded
+  headless: false
+  viewport:
+    width: 1280
+    height: 800
+
+security:
+  workspaceOnly: true
+  localhostOnly: true
+  requireApprovalBeforePatch: true
+  requireApprovalBeforeShell: true

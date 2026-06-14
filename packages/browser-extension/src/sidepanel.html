@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Oryntra Review</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #0f1117;
+        color: #e6edf3;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      header {
+        padding: 10px 12px;
+        border-bottom: 1px solid #30363d;
+        background: #161b22;
+      }
+      header h1 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .meta { font-size: 11px; color: #8b949e; }
+      .ide-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .ide-chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid #30363d;
+        background: #21262d;
+        color: inherit;
+      }
+      .ide-chip.selected {
+        border-color: #58a6ff;
+        box-shadow: 0 0 0 1px #58a6ff;
+      }
+      .ide-chip.connected {
+        border-color: #238636;
+        color: #7ee787;
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid #30363d;
+        background: #21262d;
+        color: #e6edf3;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      button.primary {
+        background: #238636;
+        border-color: #238636;
+      }
+      .status {
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #8b949e;
+      }
+      .status.error { color: #f85149; }
+      iframe {
+        flex: 1;
+        border: 0;
+        width: 100%;
+        min-height: 0;
+        background: #0d1117;
+      }
+      body.review-active header,
+      body.review-active .toolbar,
+      body.review-active .status {
+        display: none;
+      }
+      .review-bar {
+        display: none;
+        justify-content: flex-end;
+        padding: 4px 8px;
+        border-bottom: 1px solid #30363d;
+        background: #161b22;
+      }
+      body.review-active .review-bar {
+        display: flex;
+      }
+      .panel-frame {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      body.review-active iframe {
+        flex: 1;
+        min-height: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Oryntra Review</h1>
+      <div class="meta" id="session-meta">Not connected — configure below</div>
+      <div class="ide-bar" id="ide-bar"></div>
+    </header>
+    <div class="toolbar">
+      <button class="primary" id="start-btn">Start review</button>
+      <button id="refresh-btn">Refresh IDEs</button>
+      <button id="options-btn">Settings</button>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="review-bar">
+      <button type="button" id="settings-fab" title="Extension settings">Settings</button>
+    </div>
+    <div class="panel-frame">
+      <iframe id="review-frame" title="Review Studio"></iframe>
+    </div>
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

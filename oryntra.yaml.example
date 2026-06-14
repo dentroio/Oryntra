@@ -24,11 +24,14 @@ review:
 
 agent:
   # Review facilitator (Oryntra-side conversation)
-  facilitatorProvider: stub  # stub | openai | anthropic
+  facilitatorProvider: instant  # instant (default) | ide | stub | openai
   # Execution agent (IDE-side implementation) — Phase 4+
   executionProvider: cursor
 
 browser:
+  mode: extension  # enterprise default — Chrome extension + side panel
+  # mode: embedded  # dev/demo — iframe in Review Studio
+  # mode: playwright # legacy two-window (avoid)
   headless: false
   viewport:
     width: 1280

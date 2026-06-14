@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "oryntra": {
+      "command": "node",
+      "args": [
+        "/absolute/path/to/oryntra/packages/mcp/dist/index.js"
+      ],
+      "env": {
+        "ORYNTRA_URL": "http://127.0.0.1:4317",
+        "ORYNTRA_WORKSPACE": "/absolute/path/to/your/project",
+        "ORYNTRA_IDE": "cursor"
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@oryntra/browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Oryntra browser extension — enterprise single-screen review",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

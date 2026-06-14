@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "oryntra": {
+      "command": "node",
+      "args": ["scripts/oryntra-mcp.mjs"]
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Oryntra: Ensure Server (background)",
+      "type": "shell",
+      "command": "node scripts/ensure-oryntra-daemon.mjs",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "never",
+        "panel": "shared",
+        "close": true
+      },
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
+    },
+    {
+      "label": "Oryntra: Collaborate Now",
+      "type": "shell",
+      "command": "node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Oryntra: Start Demo App",
+      "type": "shell",
+      "command": "npm run demo:dev",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Oryntra: Fresh Demo Review (start over)",
+      "type": "shell",
+      "command": "node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318 --fresh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Oryntra: Open Review History",
+      "type": "shell",
+      "command": "node packages/cli/dist/index.js open-review-agent --workspace apps/demo-app",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "focus": true
+      }
+    },
+    {
+      "label": "Oryntra: Open Collaboration Room",
+      "type": "shell",
+      "command": "node packages/cli/dist/index.js open --workspace ${workspaceFolder}",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": false
+      }
+    }
+  ]
+}

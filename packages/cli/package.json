@@ -1,0 +1,37 @@
+{
+  "name": "@oryntra/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "oryntra": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./launcher": {
+      "types": "./dist/launcher.d.ts",
+      "import": "./dist/launcher.js"
+    },
+    "./collaborate": {
+      "types": "./dist/collaborate.d.ts",
+      "import": "./dist/collaborate.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@oryntra/core": "0.1.0",
+    "@oryntra/server": "0.1.0",
+    "commander": "^13.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.0"
+  }
+}

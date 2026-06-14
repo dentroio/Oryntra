@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Oryntra Extension Settings</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 560px;
+        margin: 24px auto;
+        padding: 0 16px;
+      }
+      label { display: block; margin-top: 16px; font-weight: 600; }
+      input, select {
+        width: 100%;
+        margin-top: 6px;
+        padding: 8px;
+        font-size: 14px;
+      }
+      button {
+        margin-top: 20px;
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+      p { color: #57606a; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>Oryntra Extension Settings</h1>
+    <p>Point the extension at your project workspace and default app URL.</p>
+    <label for="workspacePath">Workspace path</label>
+    <input id="workspacePath" placeholder="/Users/you/projects/clarion" />
+    <label for="appUrl">App URL (optional — defaults to active tab)</label>
+    <input id="appUrl" placeholder="http://localhost:3000" />
+    <label for="preferredIde">Preferred IDE for handoff</label>
+    <select id="preferredIde">
+      <option value="cursor">Cursor</option>
+      <option value="vscode">VS Code</option>
+      <option value="windsurf">Windsurf</option>
+      <option value="jetbrains">JetBrains</option>
+      <option value="zed">Zed</option>
+      <option value="antigravity">Antigravity</option>
+      <option value="other">Other</option>
+    </select>
+    <button id="save">Save</button>
+    <p id="saved"></p>
+    <script src="options.js"></script>
+  </body>
+</html>

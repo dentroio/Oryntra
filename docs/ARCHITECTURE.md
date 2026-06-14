@@ -1,7 +1,7 @@
 # Oryntra Architecture and Design Specification
 
-**Version:** 1.1  
-**Status:** Ready for implementation  
+**Version:** 1.2  
+**Status:** Active — extension + multi-IDE registry  
 **Audience:** Autonomous coding agents and human engineers
 
 Oryntra is a local, IDE-connected **interactive product review room** for web applications built by AI coding agents. A developer navigates a running app like production, points at UI elements, and explains what is correct, missing, or wrong — while an AI agent captures **spatial context** (mouse position, clicks, element identity, screenshots) and turns feedback into **actionable artifacts**: change requests, documentation updates, architecture notes, and work orders. Execution flows back to Cursor, VS Code, or another IDE via MCP.
@@ -37,9 +37,11 @@ Oryntra is a local, IDE-connected **interactive product review room** for web ap
 
 Oryntra closes the gap between **live product behavior** and **AI-assisted development**. Coding agents can write code, but they often lack the real-time human intent that emerges when someone clicks through the actual UI. Oryntra provides a shared, spatial review session: the developer uses a real browser; the agent sees where they are, what they clicked, and what they said.
 
-**Primary architectural choice:** Keep the Review Room in a **separate browser window** (`http://localhost:4317/session/{sessionId}`). The IDE remains the code, diff, test, and execution surface. The Review Room is the live collaboration and intent-capture surface.
+**Primary architectural choice (v1.2):** **Single-screen enterprise review** via the **Oryntra browser extension** — the app runs in a normal browser tab; Review Studio runs in the **Chrome side panel**. The local backend correlates spatial capture from the extension with IDE handoff over MCP.
 
-**Primary interaction choice:** The developer navigates a **real Chromium session** (Playwright-attached, non-headless) — not an iframe preview or screenshot-only workflow. Oryntra passively observes clicks, mouse position, routes, console/network errors, and captures visual evidence on demand.
+**Secondary path (dev / demo):** **Embedded mode** — app in Review Studio iframe with bridge script (zero install).
+
+**Legacy path:** Playwright-attached separate Chromium window — not recommended for daily use.
 
 **Primary output choice:** Feedback produces **structured artifacts** — not only code patches. Artifacts include change requests, documentation updates, architecture amendments, and work orders that hand off to the IDE agent for execution.
 
@@ -115,8 +117,10 @@ Oryntra Local Backend  (Fastify, SQLite)
 |-----------|------------------|----------------------|
 | **Review Room Web App** | Live session UI, transcript, spatial evidence strip, change requests, work orders, approval controls | React/Vite; WebSocket event stream |
 | **Oryntra Backend** | Session orchestration, spatial correlation, agent loop, persistence, API, security | Node.js/TypeScript, Fastify; localhost only |
-| **Browser Automation** | Open app, capture DOM/a11y, clicks, mouse, routes, console/network, screenshots | Playwright; one persistent Chromium per session |
-| **IDE Bridge** | Launch sessions, workspace context, file/diff events, handoff to coding agents | MCP server first; VS Code extension next |
+| **Browser Extension** | Enterprise capture from real browser tab; side panel Review Studio; IDE chips | Chrome MV3; `@oryntra/browser-extension` |
+| **IDE Registry** | Multi-IDE heartbeat, probe, session `preferredIde` | In-process registry on backend |
+| **Browser Automation** | Spatial capture via extension bridge, embedded bridge, or Playwright | `@oryntra/browser-service` |
+| **IDE Bridge** | Launch sessions, MCP tools, handoff to coding agents | MCP stdio; VS Code extension planned |
 | **Review Facilitator** | Clarify feedback, resolve elements, draft artifacts, interactive Q&A | LLM via configured provider; session-scoped |
 | **Execution Agent Provider** | Apply approved artifacts in IDE workspace (docs, code, tests) | Provider abstraction; runs in IDE via MCP |
 | **Workspace Manager** | Detect repo, Git worktree (lazy), run allowlisted commands | Worktree created on first approved patch (Phase 4+) |
@@ -126,20 +130,31 @@ Oryntra Local Backend  (Fastify, SQLite)
 
 ## 5. Browser Interaction Model
 
-This section resolves the dual-browser ambiguity from v1.0.
+Oryntra supports three **capture modes**. Enterprise deployments should use **`extension`**.
 
-### 5.1 Single Real Browser (Required)
-
-The user navigates **one Playwright-attached, non-headless Chromium window** pointed at the configured `appUrl`. This is the app under review. The Review Room does **not** embed a duplicate preview in MVP.
+### 5.1 Extension mode (enterprise default)
 
 | Aspect | Behavior |
 |--------|----------|
-| User interaction | Clicks, types, scrolls, navigates in the Chromium window |
-| Oryntra role | Passive observer via Playwright listeners |
-| Review Room role | Session console: chat, timeline, evidence, artifacts |
-| Screenshots | Captured from the same Chromium session on feedback or on demand |
+| App surface | Normal browser tab at `appUrl` (no iframe) |
+| Review UI | Chrome **side panel** → Review Studio (`?layout=sidepanel`) |
+| Capture | Extension content script → `/bridge-events`; background → `captureVisibleTab` |
+| Screenshots | Authenticated pixels from the user's visible tab |
+| MFA / OAuth | Works — app is not embedded |
 
-### 5.2 Spatial Signals Captured
+### 5.2 Embedded mode (dev / demo)
+
+| Aspect | Behavior |
+|--------|----------|
+| App surface | iframe in Review Studio left panel |
+| Bridge | `oryntra-bridge.js` injected via query params |
+| Screenshots | html2canvas in iframe session (bridge upload) |
+
+### 5.3 Playwright mode (legacy)
+
+Separate non-headless Chromium window. Two-window UX — avoid for Clarion-scale review.
+
+### 5.4 Spatial Signals Captured
 
 | Signal | When | Purpose |
 |--------|------|---------|
@@ -154,11 +169,11 @@ The user navigates **one Playwright-attached, non-headless Chromium window** poi
 | **Screenshot** | On feedback; on demand | Visual evidence for layout/color/motion |
 | **Short video clip** | Phase 6+ | Replay transitions around feedback moment |
 
-### 5.3 "Explain This" Mode
+### 5.5 "Explain This" Mode
 
 User activates **Explain This** (hotkey or Review Room button). The next click — or current pointer position at submit — becomes the **subject** of the next feedback message. The element receives a brief visual pulse in the evidence strip (bbox on captured screenshot).
 
-### 5.4 Element Picker Mode
+### 5.6 Element Picker Mode
 
 User activates **Element Picker**, then clicks one element in the app. Oryntra locks that element as the explicit subject, bypassing ambiguity in crowded UIs.
 
@@ -227,17 +242,37 @@ When feedback is submitted:
 
 The IDE launches sessions, receives artifacts, opens files/diffs, and executes work orders. It does **not** host the full Review Room.
 
+Oryntra supports **multiple IDEs simultaneously** via the **IDE Registry** — each connected MCP client or extension sends heartbeats; Review Studio and the browser extension display available IDEs and route handoff to the session's `preferredIde`.
+
 ```
-IDE (Cursor / VS Code)
-  <-> Oryntra MCP Bridge / Extension
+IDE (Cursor / VS Code / Windsurf / …)
+  <-> Oryntra MCP Bridge (heartbeat → IDE Registry)
+  <-> Browser Extension (optional side panel)
   <-> Oryntra Backend
   <-> Review Room Web App
-  <-> Browser Automation
+  <-> Browser Capture (extension | embedded | playwright)
   <-> Execution Agent (in IDE)
   <-> Git / Tests
 ```
 
-### 8.1 Cursor (MCP First)
+### 8.1 IDE Registry (multi-IDE)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/ide/heartbeat` | MCP, extension, or CLI registers `{ provider, clientId, workspacePath, source }` |
+| `GET /api/ide/connected` | Live MCP/extension connections (90s TTL) |
+| `GET /api/ide/available` | Connected + probed installed IDEs |
+| `POST /api/sessions/:id/preferred-ide` | Set handoff target for session |
+
+**Providers:** `cursor` · `vscode` · `windsurf` · `jetbrains` · `zed` · `other`
+
+Detection sources:
+
+1. **MCP heartbeat** — `ORYNTRA_IDE=cursor` (or vscode, etc.) on MCP startup and every 30s
+2. **Extension heartbeat** — browser extension registers while side panel is active
+3. **Local probe** — server checks for installed app bundles / CLI binaries
+
+### 8.2 Cursor (MCP — primary)
 
 Expose a local MCP server with session, spatial, transcript, artifact, and handoff tools. The Cursor agent calls Oryntra for review context, then edits files in the attached workspace.
 
@@ -255,7 +290,7 @@ Cursor Agent (via MCP):
   → Implements code per work order
 ```
 
-### 8.2 VS Code Extension (Lightweight)
+### 8.3 VS Code (MCP + extension — planned)
 
 - **Commands:** `Oryntra: Start Session`, `Attach Workspace`, `Open Review Room`
 - **Status bar:** active session, app URL, branch

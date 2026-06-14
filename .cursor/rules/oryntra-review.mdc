@@ -1,0 +1,28 @@
+---
+description: 
+globs: apps/demo-app/**, packages/**, .oryntra/**
+alwaysApply: false
+---
+
+# Oryntra review in Cursor
+
+## Start review (no npm, no custom mode required)
+
+If the user asks to **start review**, **open collaboration**, or **open Review Studio**:
+
+1. Call MCP **`collaborate_now`** immediately (starts server + demo app + opens browser).
+2. Call **`await_review_feedback`** to wait for Review Studio messages (uses IDE login — not CLI).
+3. When feedback arrives, call **`process_pending_review`**, then **`submit_review_response`** with a conversational reply and `change_request` draft when appropriate.
+4. Loop **`await_review_feedback`** while the review session is active.
+5. Do **not** tell them to run `npm run collaborate` or `cursor agent login`.
+
+## History
+
+Read **`apps/demo-app/.oryntra/review-history.md`** (or MCP `get_review_history`) for the full Review Studio chat.
+
+## Loop
+
+- User reviews in **browser** (Review Studio) — chat and approve there.
+- You are the facilitator via MCP (`submit_review_response`) — no headless `cursor agent` CLI.
+- You implement approved changes here in Cursor after they hit **Approve**.
+- Do not ask them to type "process feedback" in Cursor.

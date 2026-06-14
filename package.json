@@ -1,0 +1,34 @@
+{
+  "name": "oryntra",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Live AI product review room for coding agents",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @oryntra/core && npm run build -w @oryntra/facilitator && npm run build -w @oryntra/workspace && npm run build -w @oryntra/browser-service && npm run build -w @oryntra/server && npm run build -w @oryntra/review-room && npm run build -w @oryntra/cli && npm run build -w @oryntra/mcp && npm run build -w @oryntra/browser-extension",
+    "test": "npm run test -w @oryntra/facilitator && npm run test -w @oryntra/workspace",
+    "postinstall": "npx playwright install chromium",
+    "dev": "npm run dev -w @oryntra/server",
+    "dev:ui": "npm run dev -w @oryntra/review-room",
+    "start": "node packages/cli/dist/index.js",
+    "demo:dev": "npm run dev -w @oryntra/demo-app",
+    "demo:review": "node packages/cli/dist/index.js start --workspace apps/demo-app --url http://127.0.0.1:4318",
+    "open:review": "node packages/cli/dist/index.js open --workspace .",
+    "open:demo": "node packages/cli/dist/index.js open --workspace apps/demo-app --url http://127.0.0.1:4318",
+    "demo:reset": "node apps/demo-app/scripts/reset-broken.mjs",
+    "collaborate": "node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318",
+    "collaborate:fresh": "node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318 --fresh",
+    "collaborate:restart": "npm run build && node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318 --restart-server",
+    "collaborate:reset": "npm run collaborate:restart",
+    "collaborate:broken": "npm run build && npm run demo:reset && node packages/cli/dist/index.js collaborate --workspace apps/demo-app --url http://127.0.0.1:4318 --fresh --restart-server",
+    "review:history": "node packages/cli/dist/index.js open-review-agent --workspace apps/demo-app",
+    "start:demo": "npm run collaborate:restart",
+    "pm:report": "node scripts/pm-report.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
