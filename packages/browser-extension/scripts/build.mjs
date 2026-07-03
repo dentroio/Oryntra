@@ -6,16 +6,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const dist = join(root, "dist");
 
-const MIN_PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-  "base64",
-);
-
 await mkdir(join(dist, "icons"), { recursive: true });
-
-for (const size of [16, 48, 128]) {
-  await writeFile(join(dist, "icons", `icon${size}.png`), MIN_PNG);
-}
+await cp(join(root, "src", "icons"), join(dist, "icons"), { recursive: true });
 
 for (const file of [
   "manifest.json",
@@ -25,6 +17,7 @@ for (const file of [
   "sidepanel.js",
   "options.html",
   "options.js",
+  "oryntra.jpg",
 ]) {
   await cp(join(root, "src", file), join(dist, file));
 }
