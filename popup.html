@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 280px; background: #0f172a; color: #e2e8f0; font-family: -apple-system, sans-serif; }
+    .header { padding: 14px 16px 10px; border-bottom: 1px solid #1e293b; }
+    .header h1 { font-size: 13px; font-weight: 700; color: #f1f5f9; letter-spacing: 0.02em; }
+    .header p { font-size: 10px; color: #475569; margin-top: 2px; }
+    .section { padding: 10px 14px; border-bottom: 1px solid #1e293b; }
+    .label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #475569; margin-bottom: 4px; }
+    .wo-badge { font-size: 11px; font-weight: 700; color: #93c5fd; font-family: monospace; }
+    .wo-none { font-size: 11px; color: #475569; font-style: italic; }
+    .btn-primary { display: block; width: 100%; padding: 9px; background: #1d4ed8; color: #dbeafe; border: none; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { opacity: 0.4; cursor: default; }
+    .btn-secondary { display: block; width: 100%; padding: 7px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; font-size: 11px; cursor: pointer; margin-top: 6px; }
+    .btn-secondary:hover { background: #334155; }
+    .footer { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; }
+    .settings-link { font-size: 10px; color: #475569; cursor: pointer; text-decoration: underline; }
+    .status { font-size: 9px; color: #475569; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Oryntra</h1>
+    <p>AI Factory visual feedback</p>
+  </div>
+
+  <div class="section">
+    <div class="label">Active WO</div>
+    <div id="wo-display" class="wo-none">Not configured</div>
+  </div>
+
+  <div class="section">
+    <button class="btn-primary" id="annotate-btn">Annotate this page</button>
+    <button class="btn-secondary" id="cancel-btn" style="display:none">✕ Cancel annotation</button>
+  </div>
+
+  <div class="footer">
+    <span class="settings-link" id="settings-link">Settings</span>
+    <span class="status" id="status-text"></span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

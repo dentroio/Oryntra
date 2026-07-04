@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Oryntra Settings</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; max-width: 480px; margin: 40px auto; padding: 0 20px; }
+    h1 { font-size: 18px; font-weight: 700; color: #f1f5f9; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #475569; margin-bottom: 28px; }
+    .field { margin-bottom: 18px; }
+    label { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #64748b; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 13px; outline: none; }
+    input:focus { border-color: #3b82f6; }
+    .hint { font-size: 10px; color: #475569; margin-top: 4px; }
+    .actions { display: flex; gap: 10px; align-items: center; margin-top: 24px; }
+    .btn-save { padding: 10px 20px; background: #1d4ed8; color: #dbeafe; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-save:hover { background: #2563eb; }
+    .btn-detect { padding: 10px 14px; background: #1e293b; color: #94a3b8; border: 1px solid #334155; border-radius: 8px; font-size: 12px; cursor: pointer; }
+    .btn-detect:hover { background: #334155; }
+    #status { font-size: 12px; color: #22c55e; margin-left: 8px; }
+    #status.error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>Oryntra Settings</h1>
+  <p class="subtitle">Configure the AI Factory connection. Annotations will be posted to the active WO thread.</p>
+
+  <div class="field">
+    <label>AI Factory URL</label>
+    <input id="factoryUrl" type="url" placeholder="http://localhost:8099">
+    <div class="hint">Base URL of the factory status site (includes CORS proxy)</div>
+  </div>
+
+  <div class="field">
+    <label>Active WO</label>
+    <input id="activeWo" type="text" placeholder="WO-370">
+    <div class="hint">The work order to post annotations to. Leave blank to auto-detect from factory.</div>
+  </div>
+
+  <div class="field">
+    <label>Your Name</label>
+    <input id="authorName" type="text" placeholder="human">
+    <div class="hint">Shown as the message author in the WO thread.</div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-save" id="save-btn">Save</button>
+    <button class="btn-detect" id="detect-btn">Auto-detect WO</button>
+    <span id="status"></span>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
