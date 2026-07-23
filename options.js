@@ -30,14 +30,13 @@ document.getElementById("detect-btn").addEventListener("click", async () => {
   statusEl.className = "";
 
   try {
-    const resp = await fetch(`${factoryUrl}/api/status`, { signal: AbortSignal.timeout(4000) });
+    const resp = await fetch(`${factoryUrl}/api/factory/dispatch`, { signal: AbortSignal.timeout(4000) });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    const dispatch = data.dispatch_state || {};
-    let found = null;
-    for (const [woId, state] of Object.entries(dispatch)) {
-      if (["claimed", "in_progress", "awaiting_human"].includes(state.status)) { found = woId; break; }
-    }
+    const dispatch = await resp.json();
+    const active = Object.entries(dispatch)
+      .filter(([, state]) => ["claimed", "in_progress", "awaiting_human"].includes(state.status))
+      .sort(([, a], [, b]) => (b.claimed_at || "").localeCompare(a.claimed_at || ""));
+    const found = active.length ? active[0][0] : null;
     if (found) {
       document.getElementById("activeWo").value = found;
       showStatus(`Detected: ${found}`);

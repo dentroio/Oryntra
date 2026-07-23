@@ -8,13 +8,13 @@ async function getConfig() {
 
 async function tryAutoDetect(factoryUrl) {
   try {
-    const resp = await fetch(`${factoryUrl}/api/status`, { signal: AbortSignal.timeout(2000) });
+    const resp = await fetch(`${factoryUrl}/api/factory/dispatch`, { signal: AbortSignal.timeout(2000) });
     if (!resp.ok) return null;
-    const data = await resp.json();
-    const dispatch = data.dispatch_state || {};
-    for (const [woId, state] of Object.entries(dispatch)) {
-      if (["claimed", "in_progress", "awaiting_human"].includes(state.status)) return woId;
-    }
+    const dispatch = await resp.json();
+    const active = Object.entries(dispatch)
+      .filter(([, state]) => ["claimed", "in_progress", "awaiting_human"].includes(state.status))
+      .sort(([, a], [, b]) => (b.claimed_at || "").localeCompare(a.claimed_at || ""));
+    if (active.length) return active[0][0];
   } catch { /* ignore */ }
   return null;
 }

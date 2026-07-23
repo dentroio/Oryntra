@@ -18,17 +18,14 @@ export async function loadFactoryConfig() {
 
 export async function detectActiveWo(factoryUrl) {
   try {
-    const resp = await fetch(`${factoryUrl}/api/status`, { signal: AbortSignal.timeout(3000) });
+    const resp = await fetch(`${factoryUrl}/api/factory/dispatch`, { signal: AbortSignal.timeout(3000) });
     if (!resp.ok) return null;
-    const data = await resp.json();
-    // Find the first claimed/in_progress WO from dispatch state
-    const dispatch = data.dispatch_state || {};
-    for (const [woId, state] of Object.entries(dispatch)) {
-      if (["claimed", "in_progress", "awaiting_human"].includes(state.status)) {
-        return woId;
-      }
-    }
-    return null;
+    const dispatch = await resp.json();
+    // Most recently claimed WO that is still active
+    const active = Object.entries(dispatch)
+      .filter(([, state]) => ["claimed", "in_progress", "awaiting_human"].includes(state.status))
+      .sort(([, a], [, b]) => (b.claimed_at || "").localeCompare(a.claimed_at || ""));
+    return active.length ? active[0][0] : null;
   } catch {
     return null;
   }
