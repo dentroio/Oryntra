@@ -59,6 +59,8 @@ export type ReviewSession = {
   updatedAt: string;
   /** Resolved from oryntra.yaml when loading session detail */
   facilitatorProvider?: string;
+  /** Agentic-factory WO this session is bound to, e.g. "WO-1047". Null/undefined = unbound. */
+  factoryWo?: string | null;
 };
 
 export type ElementRef = {
@@ -304,7 +306,9 @@ export type ServerMessage =
       type: "agent_thread_changed";
       activeThread: AgentThread;
       threads: AgentThread[];
-    };
+    }
+  | { type: "factory_binding"; factoryWo: string | null }
+  | { type: "factory_relay_status"; ok: boolean; error?: string };
 
 export type CreateSessionRequest = {
   workspacePath: string;

@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/start.ts",
-    "start": "node dist/start.js"
+    "start": "node dist/start.js",
+    "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.0",

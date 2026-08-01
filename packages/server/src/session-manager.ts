@@ -9,6 +9,7 @@ import {
 } from "@oryntra/browser-service";
 import {
   createId,
+  getScreenshotPath,
   loadOryntraConfig,
   type AgentThread,
   type BrowserEvent,
@@ -55,6 +56,12 @@ import {
   isGitRepository,
   proposePatch,
 } from "@oryntra/workspace";
+import {
+  detectActiveWo,
+  getThreadMessages,
+  postThreadMessage,
+  type FactoryThreadMessage,
+} from "./factory/client.js";
 import {
   archiveAgentThreadHistory,
   createAgentThreadRecord,
@@ -376,6 +383,70 @@ export class SessionManager {
     return runtime.session;
   }
 
+  /** WO-1047 — bind/unbind this session to a factory WO. `wo: null` unbinds. */
+  async setFactoryWo(sessionId: string, wo: string | null): Promise<ReviewSession> {
+    const runtime = await this.ensureRuntime(sessionId);
+    runtime.session.factoryWo = wo;
+    runtime.session.updatedAt = new Date().toISOString();
+    this.store.saveSession(runtime.session);
+    this.broadcast(sessionId, { type: "factory_binding", factoryWo: wo });
+    return runtime.session;
+  }
+
+  /** WO-1047 — "Auto-detect" action: best-effort, does not bind on its own. */
+  async detectFactoryWo(): Promise<string | null> {
+    return detectActiveWo();
+  }
+
+  /** WO-1047 — read path: latest factory thread messages for a bound session's WO. */
+  async getFactoryThreadMessages(
+    sessionId: string,
+    since?: string,
+  ): Promise<FactoryThreadMessage[]> {
+    const session = this.store.getSession(sessionId);
+    if (!session?.factoryWo) return [];
+    return getThreadMessages(session.factoryWo, since);
+  }
+
+  /**
+   * WO-1047 — relay a feedback moment to the bound WO's factory thread.
+   * Fire-and-forget from the caller's perspective: retries once on failure,
+   * then broadcasts a non-blocking status the Studio can show as a warning
+   * chip. Never throws — must not affect the local review flow either way.
+   */
+  private relayEvidenceToFactory(
+    sessionId: string,
+    session: ReviewSession,
+    moment: FeedbackMoment,
+    screenshotBase64: string | undefined,
+  ): void {
+    if (!session.factoryWo) return;
+    const wo = session.factoryWo;
+    const attempt = () =>
+      postThreadMessage(wo, {
+        content: moment.transcript || "(no transcript)",
+        author: "oryntra-reviewer",
+        imageBase64: screenshotBase64,
+        sourceUrl: moment.spatial?.route,
+      });
+
+    void (async () => {
+      let result = await attempt();
+      if (!result.ok) {
+        result = await attempt();
+      }
+      if (!result.ok) {
+        this.broadcast(sessionId, {
+          type: "factory_relay_status",
+          ok: false,
+          error: result.error ?? "relay failed after retry",
+        });
+      } else {
+        this.broadcast(sessionId, { type: "factory_relay_status", ok: true });
+      }
+    })();
+  }
+
   async submitFeedback(
     sessionId: string,
     request: SubmitFeedbackRequest,
@@ -462,6 +533,21 @@ export class SessionManager {
     };
     this.store.saveFeedbackMoment(moment);
     this.broadcast(sessionId, { type: "feedback_moment", moment });
+
+    if (session.factoryWo) {
+      let screenshotBase64: string | undefined;
+      if (capturedScreenshotId) {
+        try {
+          const bytes = await readFile(
+            getScreenshotPath(sessionId, capturedScreenshotId),
+          );
+          screenshotBase64 = bytes.toString("base64");
+        } catch {
+          // Evidence relay still proceeds without an image — text-only is fine.
+        }
+      }
+      this.relayEvidenceToFactory(sessionId, session, moment, screenshotBase64);
+    }
 
     const userMessage: ChatMessage = {
       id: createId("chat"),

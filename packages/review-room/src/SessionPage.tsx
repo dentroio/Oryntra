@@ -10,6 +10,7 @@ import {
 } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { ChatMessage as ChatBubble } from "./ChatMessage.js";
+import { FactoryPanel } from "./FactoryPanel.js";
 import { FeedbackEvidenceCard } from "./FeedbackEvidence.js";
 import type {
   AgentThread,
@@ -102,6 +103,7 @@ export function SessionPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showActivity, setShowActivity] = useState(false);
+  const [factoryRelayWarning, setFactoryRelayWarning] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [iframeEpoch, setIframeEpoch] = useState(0);
@@ -505,6 +507,13 @@ export function SessionPage() {
                 }
               : prev,
           );
+          break;
+        case "factory_binding":
+          setSession((prev) => (prev ? { ...prev, factoryWo: data.factoryWo } : prev));
+          setFactoryRelayWarning(null);
+          break;
+        case "factory_relay_status":
+          setFactoryRelayWarning(data.ok ? null : (data.error ?? "Relay to factory failed"));
           break;
         case "implement_status":
           if (data.status === "completed") {
@@ -970,6 +979,14 @@ export function SessionPage() {
         ) : null}
 
         <aside className="studio-side">
+            <FactoryPanel
+              sessionId={sessionId ?? ""}
+              factoryWo={session?.factoryWo}
+              relayWarning={factoryRelayWarning}
+              onBindingChanged={(wo) =>
+                setSession((prev) => (prev ? { ...prev, factoryWo: wo } : prev))
+              }
+            />
             <div className="side-chat">
               <div className="side-chat-header">
                 <div className="agent-thread-bar">

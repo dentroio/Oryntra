@@ -991,3 +991,102 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.85em;
 }
+
+/* WO-1047 — factory WO binding panel */
+.factory-panel {
+  background: #141a24;
+  border: 1px solid #2a3344;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 10px 10px 0;
+  font-size: 0.85rem;
+}
+
+.factory-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.factory-panel-title {
+  font-weight: 600;
+  color: #e8eaed;
+}
+
+.factory-wo-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.factory-relay-warning {
+  color: #ffcf7d;
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.factory-bind-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.factory-bind-manual {
+  display: flex;
+  gap: 6px;
+}
+
+.factory-bind-manual input {
+  flex: 1;
+  background: #0e131b;
+  border: 1px solid #2a3344;
+  border-radius: 6px;
+  color: #e8eaed;
+  padding: 5px 8px;
+  font-size: 0.85rem;
+}
+
+.factory-bound {
+  margin-top: 8px;
+}
+
+.factory-unbind-btn {
+  font-size: 0.75rem;
+}
+
+.factory-agent-strip {
+  margin-top: 10px;
+  border-top: 1px solid #2a3344;
+  padding-top: 8px;
+}
+
+.factory-agent-strip-toggle {
+  background: none;
+  border: none;
+  color: #9cc4ff;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.8rem;
+}
+
+.factory-agent-strip-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.factory-agent-strip-author {
+  color: #9cc4ff;
+  font-weight: 600;
+}
+
+.factory-agent-strip-image {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-top: 4px;
+  display: block;
+}
