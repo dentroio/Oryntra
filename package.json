@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @oryntra/core && npm run build -w @oryntra/facilitator && npm run build -w @oryntra/workspace && npm run build -w @oryntra/browser-service && npm run build -w @oryntra/server && npm run build -w @oryntra/review-room && npm run build -w @oryntra/cli && npm run build -w @oryntra/mcp && npm run build -w @oryntra/browser-extension",
-    "test": "npm run test -w @oryntra/facilitator && npm run test -w @oryntra/workspace",
+    "test": "npm run test -w @oryntra/facilitator && npm run test -w @oryntra/workspace && npm run test -w @oryntra/server",
     "postinstall": "npx playwright install chromium",
     "dev": "npm run dev -w @oryntra/server",
     "dev:ui": "npm run dev -w @oryntra/review-room",

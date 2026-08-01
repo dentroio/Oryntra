@@ -344,6 +344,28 @@ export async function createApp(options: CreateAppOptions = {}) {
     },
   );
 
+  // WO-1047 — Oryntra <-> factory WO binding + evidence relay.
+  app.post<{ Params: { id: string }; Body: { wo: string | null } }>(
+    "/api/sessions/:id/factory-wo",
+    async (req, reply) => {
+      try {
+        return await manager.setFactoryWo(req.params.id, req.body.wo);
+      } catch {
+        return reply.code(404).send({ error: "Session not active" });
+      }
+    },
+  );
+
+  app.get("/api/factory/detect-active-wo", async () => {
+    const wo = await manager.detectFactoryWo();
+    return { wo };
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { since?: string } }>(
+    "/api/sessions/:id/factory-thread",
+    async (req) => manager.getFactoryThreadMessages(req.params.id, req.query.since),
+  );
+
   app.get<{ Params: { id: string } }>(
     "/api/sessions/:id/artifacts",
     async (req) => manager.listArtifacts(req.params.id),
