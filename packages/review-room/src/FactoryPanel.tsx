@@ -186,6 +186,22 @@ export function FactoryPanel({
   const otherLive = liveWork.filter((item) => item.wo !== factoryWo);
   const loadedAgents = agents.filter((a) => a.daemonLoaded);
   const talkingTo = factoryAddressedTo || factoryAgent;
+  const roster = (() => {
+    const byName = new Map<string, FactoryParticipant>();
+    for (const person of participants) byName.set(person.name, person);
+    if (factoryAgent && !byName.has(factoryAgent)) {
+      byName.set(factoryAgent, { name: factoryAgent, role: "implementer" });
+    }
+    if (factoryAddressedTo && !byName.has(factoryAddressedTo)) {
+      byName.set(factoryAddressedTo, { name: factoryAddressedTo, role: "agent" });
+    }
+    for (const agent of loadedAgents) {
+      if (!byName.has(agent.name)) {
+        byName.set(agent.name, { name: agent.name, role: "agent" });
+      }
+    }
+    return [...byName.values()];
+  })();
 
   return (
     <div className="factory-panel">
@@ -254,11 +270,11 @@ export function FactoryPanel({
 
       {factoryWo ? (
         <div className="factory-bound">
-          {participants.length > 0 ? (
+          {roster.length > 0 ? (
             <div className="factory-roster">
               <div className="factory-live-heading">Agents on this change</div>
               <div className="factory-roster-chips">
-                {participants.map((person) => (
+                {roster.map((person) => (
                   <button
                     key={person.name}
                     type="button"
