@@ -191,6 +191,11 @@ export class OryntraApiClient {
     factoryAgent: string | null;
     factoryBackend: string | null;
     factorySlug: string | null;
+    factoryAddressedTo: string | null;
+    participants: Array<{
+      name: string;
+      role: "implementer" | "reviewer" | "agent" | "human" | "system";
+    }>;
     thread: Array<{
       author: string;
       role: string;
@@ -200,6 +205,41 @@ export class OryntraApiClient {
     }>;
   }> {
     return this.get(`/api/sessions/${sessionId}/factory-context`);
+  }
+
+  async joinFactoryReview(wo: string): Promise<{
+    sessionId: string;
+    reviewRoomUrl: string;
+    wo: string;
+  }> {
+    const url = new URL("/api/factory/join", `${this.baseUrl}/`);
+    url.searchParams.set("wo", wo);
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Join factory review failed (${res.status})`);
+    }
+    return res.json() as Promise<{
+      sessionId: string;
+      reviewRoomUrl: string;
+      wo: string;
+    }>;
+  }
+
+  async setFactoryAddressedTo(
+    sessionId: string,
+    agent: string | null,
+  ): Promise<ReviewSession> {
+    const res = await fetch(`${this.baseUrl}/api/sessions/${sessionId}/factory-address`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Address factory agent failed (${res.status})`);
+    }
+    return res.json() as Promise<ReviewSession>;
   }
 
   async listFactoryLiveWork(): Promise<

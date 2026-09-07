@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type FactoryThreadMessage = {
   id?: string;
@@ -8,6 +8,11 @@ type FactoryThreadMessage = {
   content: string;
   image_url?: string;
   timestamp?: string;
+};
+
+type FactoryParticipant = {
+  name: string;
+  role: "implementer" | "reviewer" | "agent" | "human" | "system";
 };
 
 type LiveWork = {
@@ -32,12 +37,14 @@ type Props = {
   factoryWo: string | null | undefined;
   factoryAgent?: string | null;
   factorySlug?: string | null;
+  factoryAddressedTo?: string | null;
   relayWarning: string | null;
   onBindingChanged: (binding: {
     factoryWo: string | null;
     factoryAgent?: string | null;
     factoryBackend?: string | null;
     factorySlug?: string | null;
+    factoryAddressedTo?: string | null;
   }) => void;
 };
 
@@ -54,6 +61,7 @@ export function FactoryPanel({
   factoryWo,
   factoryAgent,
   factorySlug,
+  factoryAddressedTo,
   relayWarning,
   onBindingChanged,
 }: Props) {
@@ -63,8 +71,8 @@ export function FactoryPanel({
   const [liveWork, setLiveWork] = useState<LiveWork[]>([]);
   const [agents, setAgents] = useState<FactoryAgent[]>([]);
   const [messages, setMessages] = useState<FactoryThreadMessage[]>([]);
+  const [participants, setParticipants] = useState<FactoryParticipant[]>([]);
   const [threadOpen, setThreadOpen] = useState(true);
-  const sinceRef = useRef<string | undefined>(undefined);
 
   async function bind(wo: string | null) {
     setBinding(true);
@@ -81,12 +89,14 @@ export function FactoryPanel({
         factoryAgent?: string | null;
         factoryBackend?: string | null;
         factorySlug?: string | null;
+        factoryAddressedTo?: string | null;
       };
       onBindingChanged({
         factoryWo: session.factoryWo ?? wo,
         factoryAgent: session.factoryAgent ?? null,
         factoryBackend: session.factoryBackend ?? null,
         factorySlug: session.factorySlug ?? null,
+        factoryAddressedTo: session.factoryAddressedTo ?? null,
       });
       setManualWo("");
     } catch (e) {
@@ -123,25 +133,43 @@ export function FactoryPanel({
     };
   }, []);
 
+  async function address(agent: string) {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/factory-address`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent }),
+      });
+      if (!res.ok) return;
+      const session = (await res.json()) as { factoryAddressedTo?: string | null };
+      onBindingChanged({
+        factoryWo: factoryWo ?? null,
+        factoryAgent,
+        factorySlug,
+        factoryAddressedTo: session.factoryAddressedTo ?? agent,
+      });
+    } catch {
+      // Keep local review usable if the factory address call fails.
+    }
+  }
+
   useEffect(() => {
-    sinceRef.current = undefined;
     setMessages([]);
-    if (!factoryWo) return;
+    setParticipants([]);
+    if (!factoryWo || !sessionId) return;
 
     let cancelled = false;
     async function poll() {
       try {
-        const url = new URL(
-          `/api/sessions/${sessionId}/factory-thread`,
-          window.location.origin,
-        );
-        if (sinceRef.current) url.searchParams.set("since", sinceRef.current);
-        const res = await fetch(url);
+        const res = await fetch(`/api/sessions/${sessionId}/factory-context`);
         if (!res.ok || cancelled) return;
-        const fresh = (await res.json()) as FactoryThreadMessage[];
-        if (fresh.length === 0 || cancelled) return;
-        sinceRef.current = fresh[fresh.length - 1]?.id ?? sinceRef.current;
-        setMessages((prev) => [...prev, ...fresh].slice(-80));
+        const body = (await res.json()) as {
+          thread?: FactoryThreadMessage[];
+          participants?: FactoryParticipant[];
+        };
+        if (cancelled) return;
+        setMessages((body.thread ?? []).slice(-80));
+        setParticipants(body.participants ?? []);
       } catch {
         // Transient — next poll tick will retry.
       }
@@ -157,6 +185,7 @@ export function FactoryPanel({
 
   const otherLive = liveWork.filter((item) => item.wo !== factoryWo);
   const loadedAgents = agents.filter((a) => a.daemonLoaded);
+  const talkingTo = factoryAddressedTo || factoryAgent;
 
   return (
     <div className="factory-panel">
@@ -164,7 +193,7 @@ export function FactoryPanel({
         <span className="factory-panel-title">Factory</span>
         {factoryWo ? (
           <span className="tag factory-wo-tag">
-            {factoryAgent ? `${factoryAgent} · ${factoryWo}` : factoryWo}
+            {talkingTo ? `${talkingTo} · ${factoryWo}` : factoryWo}
           </span>
         ) : (
           <span className="muted">Scratch review</span>
@@ -173,14 +202,15 @@ export function FactoryPanel({
 
       {factoryWo ? (
         <p className="factory-mode-hint">
-          Talking to {factoryAgent || "the claiming agent"} on {factoryWo}
-          {factorySlug ? ` (${factorySlug})` : ""}. Feedback and screenshots go
-          into that thread — existing memory stays.
+          Correcting {talkingTo || "the claiming agent"} on {factoryWo}
+          {factorySlug ? ` (${factorySlug})` : ""}. Pick a participant to
+          address; feedback stays on this WO thread.
         </p>
       ) : (
         <p className="factory-mode-hint">
-          Not bound to a factory agent. Describe or correct anything. Approve a
-          change, then Send to Factory to queue a new WO.
+          {loadedAgents.length > 0
+            ? `${loadedAgents.map((a) => a.name).join(" and ")} can claim new work. Describe a change, approve it, then Send to Factory.`
+            : "No factory runner is online. You can still review locally; Send to Factory queues a WO when a runner is back."}
         </p>
       )}
 
@@ -209,14 +239,42 @@ export function FactoryPanel({
           ))}
         </div>
       ) : loadedAgents.length > 0 && !factoryWo ? (
-        <p className="muted factory-empty-live">
-          {loadedAgents.map((a) => a.name).join(", ")} online, none currently
-          claimed on a WO.
-        </p>
+        <div className="factory-roster">
+          <div className="factory-live-heading">Available for new updates</div>
+          <div className="factory-roster-chips">
+            {loadedAgents.map((agent) => (
+              <span key={agent.name} className="factory-roster-chip idle">
+                {agent.name}
+                <span className="muted"> idle</span>
+              </span>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {factoryWo ? (
         <div className="factory-bound">
+          {participants.length > 0 ? (
+            <div className="factory-roster">
+              <div className="factory-live-heading">Agents on this change</div>
+              <div className="factory-roster-chips">
+                {participants.map((person) => (
+                  <button
+                    key={person.name}
+                    type="button"
+                    className={`factory-roster-chip${
+                      talkingTo === person.name ? " active" : ""
+                    }`}
+                    disabled={binding}
+                    onClick={() => void address(person.name)}
+                  >
+                    {person.name}
+                    <span className="muted"> {person.role}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
             className="secondary factory-unbind-btn"

@@ -70,6 +70,24 @@ test("postThreadMessage rewrites orchestrator-relative image_url to the status-s
   );
 });
 
+test("postThreadMessage prefixes @agent and records addressed_to metadata", async () => {
+  mockFetch((_url, init) => {
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      content: string;
+      metadata?: { addressed_to?: string };
+    };
+    assert.equal(body.content, "@cursor: drawer is wrong");
+    assert.equal(body.metadata?.addressed_to, "cursor");
+    return Response.json({ id: "msg_1" });
+  });
+  const result = await postThreadMessage("WO-9", {
+    content: "drawer is wrong",
+    author: "oryntra-reviewer",
+    addressedTo: "cursor",
+  });
+  assert.equal(result.ok, true);
+});
+
 test("postThreadMessage never throws on network failure — returns ok:false", async () => {
   mockFetch(() => {
     throw new TypeError("fetch failed");

@@ -1103,6 +1103,42 @@ code {
   font-size: 0.75rem;
 }
 
+.factory-roster {
+  margin-bottom: 8px;
+}
+
+.factory-roster-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.factory-roster-chip {
+  background: #0e131b;
+  border: 1px solid #2a3344;
+  border-radius: 999px;
+  color: #e8eaed;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.factory-roster-chip:hover:not(:disabled) {
+  border-color: #35588a;
+}
+
+.factory-roster-chip.active {
+  border-color: #4c7fd4;
+  background: #152238;
+  color: #9cc4ff;
+}
+
+.factory-roster-chip.idle {
+  cursor: default;
+  color: #a8b3c7;
+}
+
 .factory-agent-strip {
   margin-top: 10px;
   border-top: 1px solid #2a3344;

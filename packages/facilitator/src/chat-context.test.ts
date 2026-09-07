@@ -49,7 +49,7 @@ test("first message has no conversation wrapper", () => {
 test("factory thread is injected as memory when the session is bound to an agent", () => {
   const ctx = buildEffectiveTranscript({
     transcript: "the drawer still loses filters",
-    factoryBinding: { wo: "WO-1080", agent: "cursor" },
+    factoryBinding: { wo: "WO-1080", agent: "cursor", addressedTo: "security" },
     factoryThread: [
       { role: "user", content: "open details in a drawer" },
       { role: "agent", content: "switching View Details to a drawer" },
@@ -58,6 +58,7 @@ test("factory thread is injected as memory when the session is bound to an agent
   assert.equal(ctx.hasConversationContext, true);
   assert.match(ctx.effectiveTranscript, /WO-1080/);
   assert.match(ctx.effectiveTranscript, /cursor/);
+  assert.match(ctx.effectiveTranscript, /Address this correction to security/);
   assert.match(ctx.effectiveTranscript, /Factory agent thread/);
   assert.match(ctx.effectiveTranscript, /switching View Details/);
   assert.match(ctx.effectiveTranscript, /still loses filters/);

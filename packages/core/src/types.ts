@@ -67,6 +67,8 @@ export type ReviewSession = {
   factoryBackend?: string | null;
   /** WO slug from dispatch, when known. */
   factorySlug?: string | null;
+  /** Thread participant this session is currently addressing. */
+  factoryAddressedTo?: string | null;
 };
 
 export type ElementRef = {
@@ -323,6 +325,7 @@ export type ServerMessage =
       factoryAgent?: string | null;
       factoryBackend?: string | null;
       factorySlug?: string | null;
+      factoryAddressedTo?: string | null;
     }
   | { type: "factory_relay_status"; ok: boolean; error?: string };
 
@@ -350,6 +353,8 @@ export type SubmitFeedbackRequest = {
   /** Reuse capture from manual Snap (FEAT-019) */
   screenshotId?: string;
   accessibilitySnapshotId?: string;
+  /** Factory thread participant to address (claiming agent or reviewer). */
+  addressedTo?: string | null;
 };
 
 export type SnapPreviewResponse = {

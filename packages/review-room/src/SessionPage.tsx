@@ -89,8 +89,9 @@ function shortRoute(route: string): string {
 
 export function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sidePanelLayout = searchParams.get("layout") === "sidepanel";
+  const woParam = searchParams.get("wo");
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [browserState, setBrowserState] = useState<BrowserState | null>(null);
   const [events, setEvents] = useState<BrowserEvent[]>([]);
@@ -517,6 +518,7 @@ export function SessionPage() {
                   factoryAgent: data.factoryAgent,
                   factoryBackend: data.factoryBackend,
                   factorySlug: data.factorySlug,
+                  factoryAddressedTo: data.factoryAddressedTo,
                 }
               : prev,
           );
@@ -568,6 +570,42 @@ export function SessionPage() {
 
     return () => ws.close();
   }, [apiBase, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !session || !woParam) return;
+    const bound = (session.factoryWo ?? "").replace(/^WO-/i, "");
+    const incoming = woParam.replace(/^WO-/i, "");
+    if (bound && bound === incoming) {
+      if (searchParams.has("wo")) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("wo");
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/sessions/${sessionId}/factory-wo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wo: woParam }),
+        });
+        if (!res.ok || cancelled) return;
+        const updated = (await res.json()) as ReviewSession;
+        if (cancelled) return;
+        setSession(updated);
+        const next = new URLSearchParams(searchParams);
+        next.delete("wo");
+        setSearchParams(next, { replace: true });
+      } catch {
+        // Join from a WO query is best-effort; the factory panel still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, sessionId, session, woParam, searchParams, setSearchParams]);
 
   async function setMode(mode: ReviewMode) {
     if (!sessionId) return;
@@ -739,6 +777,7 @@ export function SessionPage() {
           reviewMode,
           screenshotId: stagedSnap?.screenshotId,
           accessibilitySnapshotId: stagedSnap?.accessibilitySnapshotId,
+          addressedTo: session?.factoryAddressedTo ?? session?.factoryAgent ?? null,
         }),
       });
       if (!res.ok) {
@@ -994,6 +1033,7 @@ export function SessionPage() {
               factoryWo={session?.factoryWo}
               factoryAgent={session?.factoryAgent}
               factorySlug={session?.factorySlug}
+              factoryAddressedTo={session?.factoryAddressedTo}
               relayWarning={factoryRelayWarning}
               onBindingChanged={(binding) =>
                 setSession((prev) =>
@@ -1004,6 +1044,7 @@ export function SessionPage() {
                         factoryAgent: binding.factoryAgent,
                         factoryBackend: binding.factoryBackend,
                         factorySlug: binding.factorySlug,
+                        factoryAddressedTo: binding.factoryAddressedTo,
                       }
                     : prev,
                 )

@@ -69,7 +69,7 @@ export function buildEffectiveTranscript(input: {
   chatHistory?: ChatMessage[];
   artifacts?: ReviewArtifact[];
   factoryThread?: FactoryContextLine[];
-  factoryBinding?: { wo: string; agent?: string | null };
+  factoryBinding?: { wo: string; agent?: string | null; addressedTo?: string | null };
 }): FeedbackContext {
   const chatHistory = input.chatHistory ?? [];
   const artifacts = input.artifacts ?? [];
@@ -94,8 +94,11 @@ export function buildEffectiveTranscript(input: {
     const agent = input.factoryBinding.agent
       ? ` (agent ${input.factoryBinding.agent})`
       : "";
+    const addressed = input.factoryBinding.addressedTo
+      ? ` Address this correction to ${input.factoryBinding.addressedTo}.`
+      : "";
     parts.push(
-      `This review continues factory work ${input.factoryBinding.wo}${agent}. Do not start over — use the factory thread below as memory.`,
+      `This review continues factory work ${input.factoryBinding.wo}${agent}.${addressed} Do not start over — use the factory thread below as memory.`,
       "",
     );
   }

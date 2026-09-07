@@ -26,7 +26,7 @@ export type ProcessFeedbackInput = {
   reviewRoomUrl?: string;
   /** Factory WO thread (system of record when the session is bound to an agent). */
   factoryThread?: { role: "user" | "agent"; content: string }[];
-  factoryBinding?: { wo: string; agent?: string | null };
+  factoryBinding?: { wo: string; agent?: string | null; addressedTo?: string | null };
 };
 
 export type FacilitatorFactoryDeps = {

@@ -365,6 +365,38 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   app.get("/api/factory/agents", async () => manager.listFactoryAgents());
 
+  app.get<{
+    Querystring: { wo?: string; workspacePath?: string; appUrl?: string };
+  }>("/api/factory/join", async (req, reply) => {
+    try {
+      const result = await manager.joinFactoryReview({
+        wo: req.query.wo ?? "",
+        workspacePath: req.query.workspacePath,
+        appUrl: req.query.appUrl,
+      });
+      const accept = String(req.headers.accept ?? "");
+      if (accept.includes("application/json")) {
+        return result;
+      }
+      return reply.redirect(result.reviewRoomUrl);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not open factory review";
+      return reply.code(409).send({ error: message });
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { agent: string | null } }>(
+    "/api/sessions/:id/factory-address",
+    async (req, reply) => {
+      try {
+        return await manager.setFactoryAddressedTo(req.params.id, req.body.agent);
+      } catch {
+        return reply.code(404).send({ error: "Session not active" });
+      }
+    },
+  );
+
   app.get<{ Params: { id: string }; Querystring: { since?: string } }>(
     "/api/sessions/:id/factory-thread",
     async (req) => manager.getFactoryThreadMessages(req.params.id, req.query.since),

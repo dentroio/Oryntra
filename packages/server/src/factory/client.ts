@@ -4,6 +4,8 @@
  * See docs/ORYNTRA_FACTORY_INTEGRATION.md (agentic-factory repo) / WO-1047.
  */
 
+import { formatAddressedFeedback } from "./participants.js";
+
 const DEFAULT_FACTORY_URL = "http://localhost:8099";
 
 export type FactoryDispatchStatus =
@@ -79,7 +81,7 @@ export type FactoryThreadMessage = {
   id?: string;
   author: string;
   role: string;
-  type: "text" | "image";
+  type: "text" | "image" | "review" | string;
   content: string;
   image_url?: string;
   metadata?: Record<string, unknown>;
@@ -92,6 +94,7 @@ export type PostThreadMessageInput = {
   author: string;
   imageBase64?: string;
   sourceUrl?: string;
+  addressedTo?: string | null;
 };
 
 function factoryUrl(override?: string | null): string {
@@ -309,9 +312,13 @@ export async function postThreadMessage(
         author: input.author,
         role: "human",
         type: input.imageBase64 ? "image" : "text",
-        content: input.content,
+        content: formatAddressedFeedback(input.content, input.addressedTo),
         image_data: input.imageBase64,
-        metadata: { source_url: input.sourceUrl, tool: "oryntra" },
+        metadata: {
+          source_url: input.sourceUrl,
+          tool: "oryntra",
+          addressed_to: input.addressedTo ?? undefined,
+        },
       }),
       signal: AbortSignal.timeout(8000),
     });

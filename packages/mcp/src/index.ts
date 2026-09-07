@@ -273,8 +273,8 @@ server.registerTool(
       workspacePath: session.workspacePath,
       appUrl: session.appUrl,
       instructions: factoryContext.factoryWo
-        ? `This session is bound to factory ${factoryContext.factoryWo} (agent ${factoryContext.factoryAgent ?? "unclaimed"}). Continue that agent's thread — do not start over. factoryContext.thread is the memory. Reply via submit_review_response.`
-        : "Scratch review (not bound to a factory agent). Reply conversationally via submit_review_response. Include a change_request draft when the reviewer wants a change. Use export_artifact_to_factory after approval to queue a new factory WO.",
+        ? `This session is bound to factory ${factoryContext.factoryWo} (implementer ${factoryContext.factoryAgent ?? "unclaimed"}; addressing ${factoryContext.factoryAddressedTo ?? factoryContext.factoryAgent ?? "the claiming agent"}). Continue that thread — do not start over. factoryContext.thread is the memory; factoryContext.participants is the roster. Reply via submit_review_response. To correct a specific agent, call address_factory_agent first.`
+        : "Scratch review (not bound to a factory agent). Idle factory runners can claim new work after export_artifact_to_factory. Reply conversationally via submit_review_response. Include a change_request draft when the reviewer wants a change.",
     });
   },
 );
@@ -588,6 +588,42 @@ server.registerTool(
     const session = await client.bindFactoryWo(id, wo);
     const factoryContext = await client.getFactoryContext(id);
     return textResult({ session, factoryContext });
+  },
+);
+
+server.registerTool(
+  "join_factory_review",
+  {
+    description:
+      "Open or reuse the active Review Studio session bound to a factory WO (same as the factory status-site Open in Oryntra button).",
+    inputSchema: {
+      wo: z.string().describe("Factory WO id such as WO-1080"),
+    },
+  },
+  async ({ wo }) => {
+    const result = await client.joinFactoryReview(wo);
+    const factoryContext = await client.getFactoryContext(result.sessionId);
+    return textResult({ ...result, factoryContext });
+  },
+);
+
+server.registerTool(
+  "address_factory_agent",
+  {
+    description:
+      "Address subsequent review feedback to a specific factory participant on the bound WO (implementer or reviewer). Uses @agent: tagging on the thread.",
+    inputSchema: {
+      sessionId: z.string().optional(),
+      agent: z
+        .string()
+        .nullable()
+        .describe("Participant name such as cursor or security, or null to clear"),
+    },
+  },
+  async ({ sessionId, agent }) => {
+    const id = await resolveSessionId(sessionId);
+    const session = await client.setFactoryAddressedTo(id, agent);
+    return textResult({ session });
   },
 );
 

@@ -68,6 +68,10 @@ import {
 } from "./factory/client.js";
 import { exportArtifactToFactory } from "./factory/export.js";
 import {
+  normalizeFactoryWoId,
+  participantsFromThread,
+} from "./factory/participants.js";
+import {
   archiveAgentThreadHistory,
   createAgentThreadRecord,
   deriveAgentThreadTitle,
@@ -395,12 +399,14 @@ export class SessionManager {
     runtime.session.factoryAgent = null;
     runtime.session.factoryBackend = null;
     runtime.session.factorySlug = null;
+    runtime.session.factoryAddressedTo = null;
     if (wo) {
       const live = await getDispatchEntry(wo);
       if (live) {
         runtime.session.factoryAgent = live.agent || null;
         runtime.session.factoryBackend = live.backend || null;
         runtime.session.factorySlug = live.slug || null;
+        runtime.session.factoryAddressedTo = live.agent || null;
       }
     }
     runtime.session.updatedAt = new Date().toISOString();
@@ -411,6 +417,7 @@ export class SessionManager {
       factoryAgent: runtime.session.factoryAgent ?? null,
       factoryBackend: runtime.session.factoryBackend ?? null,
       factorySlug: runtime.session.factorySlug ?? null,
+      factoryAddressedTo: runtime.session.factoryAddressedTo ?? null,
     });
     return runtime.session;
   }
@@ -428,11 +435,72 @@ export class SessionManager {
     return listFactoryAgents();
   }
 
+  async setFactoryAddressedTo(
+    sessionId: string,
+    agent: string | null,
+  ): Promise<ReviewSession> {
+    const runtime = await this.ensureRuntime(sessionId);
+    const addressedTo = agent?.trim() ? agent.trim() : null;
+    runtime.session.factoryAddressedTo = addressedTo;
+    runtime.session.updatedAt = new Date().toISOString();
+    this.store.saveSession(runtime.session);
+    this.broadcast(sessionId, {
+      type: "factory_binding",
+      factoryWo: runtime.session.factoryWo ?? null,
+      factoryAgent: runtime.session.factoryAgent ?? null,
+      factoryBackend: runtime.session.factoryBackend ?? null,
+      factorySlug: runtime.session.factorySlug ?? null,
+      factoryAddressedTo: addressedTo,
+    });
+    return runtime.session;
+  }
+
+  /**
+   * Factory "Open in Oryntra" entry: reuse the active session (or start one
+   * from ORYNTRA_WORKSPACE) and bind it to the WO so thread memory is loaded.
+   */
+  async joinFactoryReview(input: {
+    wo: string;
+    workspacePath?: string;
+    appUrl?: string;
+  }): Promise<{ sessionId: string; reviewRoomUrl: string; wo: string }> {
+    const wo = normalizeFactoryWoId(input.wo);
+    if (!wo) {
+      throw new Error("Missing factory WO id");
+    }
+    let session = this.getActiveSession();
+    if (!session) {
+      const workspacePath =
+        input.workspacePath || process.env.ORYNTRA_WORKSPACE || "";
+      if (!workspacePath) {
+        throw new Error(
+          "No active Oryntra session. Start Review Studio first, then open this WO again.",
+        );
+      }
+      const created = await this.createSession({
+        workspacePath,
+        appUrl: input.appUrl ?? "",
+      });
+      session = this.getSession(created.sessionId);
+    }
+    if (!session) {
+      throw new Error("Could not open an Oryntra session");
+    }
+    await this.setFactoryWo(session.id, wo);
+    return {
+      sessionId: session.id,
+      reviewRoomUrl: this.reviewRoomUrl(session.id),
+      wo,
+    };
+  }
+
   async getFactoryContext(sessionId: string): Promise<{
     factoryWo: string | null;
     factoryAgent: string | null;
     factoryBackend: string | null;
     factorySlug: string | null;
+    factoryAddressedTo: string | null;
+    participants: ReturnType<typeof participantsFromThread>;
     thread: FactoryThreadMessage[];
   }> {
     const session = this.getSession(sessionId);
@@ -442,6 +510,8 @@ export class SessionManager {
         factoryAgent: null,
         factoryBackend: null,
         factorySlug: null,
+        factoryAddressedTo: null,
+        participants: [],
         thread: [],
       };
     }
@@ -451,6 +521,8 @@ export class SessionManager {
       factoryAgent: session.factoryAgent ?? null,
       factoryBackend: session.factoryBackend ?? null,
       factorySlug: session.factorySlug ?? null,
+      factoryAddressedTo: session.factoryAddressedTo ?? null,
+      participants: participantsFromThread(thread, session.factoryAgent),
       thread,
     };
   }
@@ -496,12 +568,15 @@ export class SessionManager {
   ): void {
     if (!session.factoryWo) return;
     const wo = session.factoryWo;
+    const addressedTo =
+      session.factoryAddressedTo || session.factoryAgent || null;
     const attempt = () =>
       postThreadMessage(wo, {
         content: moment.transcript || "(no transcript)",
         author: "oryntra-reviewer",
         imageBase64: screenshotBase64,
         sourceUrl: moment.spatial?.route,
+        addressedTo,
       });
 
     void (async () => {
@@ -530,6 +605,9 @@ export class SessionManager {
     const modality = request.modality ?? "typed";
     const reviewMode = request.reviewMode ?? session.reviewMode;
     const transcript = request.transcript.trim();
+    if (request.addressedTo !== undefined) {
+      session.factoryAddressedTo = request.addressedTo;
+    }
 
     const targetIde = resolveTargetIde(session, config);
 
@@ -651,7 +729,11 @@ export class SessionManager {
       reviewRoomUrl: this.reviewRoomUrl(sessionId),
       factoryThread,
       factoryBinding: session.factoryWo
-        ? { wo: session.factoryWo, agent: session.factoryAgent }
+        ? {
+            wo: session.factoryWo,
+            agent: session.factoryAgent,
+            addressedTo: session.factoryAddressedTo,
+          }
         : undefined,
     });
 
@@ -675,7 +757,11 @@ export class SessionManager {
         artifacts: this.listArtifacts(sessionId),
         factoryThread,
         factoryBinding: session.factoryWo
-          ? { wo: session.factoryWo, agent: session.factoryAgent }
+          ? {
+              wo: session.factoryWo,
+              agent: session.factoryAgent,
+              addressedTo: session.factoryAddressedTo,
+            }
           : undefined,
       });
     } else if (facilitatorResponse.suggestedArtifacts?.length) {
@@ -1206,7 +1292,7 @@ export class SessionManager {
       chatHistory: ChatMessage[];
       artifacts: ReviewArtifact[];
       factoryThread?: { role: "user" | "agent"; content: string }[];
-      factoryBinding?: { wo: string; agent?: string | null };
+      factoryBinding?: { wo: string; agent?: string | null; addressedTo?: string | null };
     },
   ): void {
     const key = this.ideFallbackKey(sessionId, momentId);
@@ -1240,7 +1326,7 @@ export class SessionManager {
       chatHistory: ChatMessage[];
       artifacts: ReviewArtifact[];
       factoryThread?: { role: "user" | "agent"; content: string }[];
-      factoryBinding?: { wo: string; agent?: string | null };
+      factoryBinding?: { wo: string; agent?: string | null; addressedTo?: string | null };
     },
   ): Promise<void> {
     this.ideFallbackTimers.delete(this.ideFallbackKey(sessionId, momentId));
