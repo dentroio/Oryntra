@@ -50,6 +50,12 @@ export async function createApp(options: CreateAppOptions = {}) {
   const publicDir = join(__dirname, "../public");
 
   await app.register(cors, { origin: true });
+  app.addHook("onSend", async (_req, reply) => {
+    reply.header(
+      "Content-Security-Policy",
+      "frame-ancestors 'self' chrome-extension:",
+    );
+  });
 
   app.get("/oryntra-bridge.js", async (_req, reply) => {
     return reply.sendFile("oryntra-bridge.js", publicDir);

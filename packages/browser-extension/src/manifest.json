@@ -1,25 +1,35 @@
 {
   "manifest_version": 3,
   "name": "Oryntra Review",
-  "version": "0.1.0",
+  "version": "0.1.8",
   "description": "Single-screen product review for enterprise web apps. Captures spatial feedback from your real browser tab and connects to Cursor, VS Code, and other IDEs.",
   "permissions": ["activeTab", "tabs", "sidePanel", "storage", "scripting"],
   "host_permissions": [
-    "http://127.0.0.1:4317/*",
-    "http://localhost:*/*"
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://*.netlab.net/*",
+    "https://clarion.netlab.net/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*.netlab.net/*",
+        "https://clarion.netlab.net/*"
+      ],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
   ],
   "side_panel": {
     "default_path": "sidepanel.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://127.0.0.1:4317 ws://127.0.0.1:4317 http://localhost:4317 ws://localhost:4317"
   },
   "options_page": "options.html",
   "action": {

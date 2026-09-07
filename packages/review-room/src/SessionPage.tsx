@@ -258,6 +258,9 @@ export function SessionPage() {
     }
   }, [awaitingMomentId, feedbackMoments, chat]);
 
+  const usesIdeFacilitator = session?.facilitatorProvider === "ide";
+  const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
+
   useEffect(() => {
     if (!awaitingMomentId) return;
     const timeout = window.setTimeout(() => {
@@ -270,8 +273,6 @@ export function SessionPage() {
     return () => window.clearTimeout(timeout);
   }, [awaitingMomentId, ideLabel]);
 
-  const usesIdeFacilitator = session?.facilitatorProvider === "ide";
-  const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
   const waitingForIde =
     usesIdeFacilitator &&
     (submitting ||
@@ -307,6 +308,9 @@ export function SessionPage() {
   const apiBase = useMemo(() => "", []);
   const embedded = session?.captureMode === "embedded";
   const extensionMode = session?.captureMode === "extension";
+  // Clarion (or any live app) lives in another tab. Don't leave an empty
+  // black stage that crowds out chat in the Review Room window.
+  const hideAppStage = sidePanelLayout || extensionMode;
 
   useEffect(() => {
     activeThreadIdRef.current = activeThread?.id ?? null;
@@ -862,6 +866,7 @@ export function SessionPage() {
       {!sidePanelLayout ? (
       <header className="studio-header">
         <div className="studio-brand">
+          <img className="studio-mark" src="/oryntra.png" alt="" />
           <span className="studio-logo">Oryntra</span>
           <span className="studio-sub">Review Studio</span>
         </div>
@@ -877,6 +882,7 @@ export function SessionPage() {
       ) : (
         <header className="studio-header studio-header-compact">
           <div className="compact-status-row">
+            <img className="studio-mark studio-mark-compact" src="/oryntra.png" alt="" />
             <span className="compact-label">Page</span>
             <span className="status-pill" title={browserState?.route ?? session?.appUrl}>
               {shortRoute(browserState?.route ?? session?.appUrl ?? "/")}
@@ -972,16 +978,16 @@ export function SessionPage() {
       ) : null}
 
       <div
-        className={`studio-body${sidePanelLayout ? " sidepanel-layout" : ""}`}
+        className={`studio-body${hideAppStage ? " sidepanel-layout" : ""}`}
         style={
           {
-            "--chat-panel-width": sidePanelLayout
+            "--chat-panel-width": hideAppStage
               ? "100%"
               : `${chatPanelWidth}px`,
           } as CSSProperties
         }
       >
-        {!sidePanelLayout ? (
+        {!hideAppStage ? (
         <section className="studio-app">
           <div className="studio-app-label">
             {embedded
@@ -1017,7 +1023,7 @@ export function SessionPage() {
         </section>
         ) : null}
 
-        {!sidePanelLayout ? (
+        {!hideAppStage ? (
         <div
           className={`studio-resizer${resizingChat ? " dragging" : ""}`}
           role="separator"

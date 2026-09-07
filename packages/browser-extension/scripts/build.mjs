@@ -17,7 +17,7 @@ for (const file of [
   "sidepanel.js",
   "options.html",
   "options.js",
-  "oryntra.jpg",
+  "oryntra.png",
 ]) {
   await cp(join(root, "src", file), join(dist, file));
 }

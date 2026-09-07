@@ -90,16 +90,16 @@
       return;
     }
     try {
-      chrome.runtime.sendMessage(
-        {
-          type: "oryntra_bridge_event",
-          sessionId,
-          payload,
-        },
-        function () {
-          void chrome.runtime.lastError;
-        },
-      );
+      const sent = chrome.runtime.sendMessage({
+        type: "oryntra_bridge_event",
+        sessionId,
+        payload,
+      });
+      if (sent && typeof sent.catch === "function") {
+        sent.catch(function () {
+          stopCapture("invalidated");
+        });
+      }
     } catch {
       stopCapture("invalidated");
     }
@@ -178,9 +178,10 @@
     contextDead = false;
     sessionId = nextSession;
     try {
-      chrome.runtime.sendMessage({ type: "oryntra_bind_tab" }, function () {
-        void chrome.runtime.lastError;
-      });
+      const sent = chrome.runtime.sendMessage({ type: "oryntra_bind_tab" });
+      if (sent && typeof sent.catch === "function") {
+        sent.catch(function () {});
+      }
     } catch {
       stopCapture("invalidated");
       return;
