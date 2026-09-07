@@ -24,6 +24,9 @@ export type ProcessFeedbackInput = {
   /** Cursor agent chat id from .oryntra/agent-session.json */
   cursorChatId?: string;
   reviewRoomUrl?: string;
+  /** Factory WO thread (system of record when the session is bound to an agent). */
+  factoryThread?: { role: "user" | "agent"; content: string }[];
+  factoryBinding?: { wo: string; agent?: string | null };
 };
 
 export type FacilitatorFactoryDeps = {

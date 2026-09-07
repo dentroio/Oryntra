@@ -344,7 +344,7 @@ export async function createApp(options: CreateAppOptions = {}) {
     },
   );
 
-  // WO-1047 — Oryntra <-> factory WO binding + evidence relay.
+  // WO-1047 / agent-aware factory cockpit.
   app.post<{ Params: { id: string }; Body: { wo: string | null } }>(
     "/api/sessions/:id/factory-wo",
     async (req, reply) => {
@@ -361,9 +361,38 @@ export async function createApp(options: CreateAppOptions = {}) {
     return { wo };
   });
 
+  app.get("/api/factory/live-work", async () => manager.listFactoryLiveWork());
+
+  app.get("/api/factory/agents", async () => manager.listFactoryAgents());
+
   app.get<{ Params: { id: string }; Querystring: { since?: string } }>(
     "/api/sessions/:id/factory-thread",
     async (req) => manager.getFactoryThreadMessages(req.params.id, req.query.since),
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/sessions/:id/factory-context",
+    async (req, reply) => {
+      const session = manager.getSession(req.params.id);
+      if (!session) return reply.code(404).send({ error: "Session not found" });
+      return manager.getFactoryContext(req.params.id);
+    },
+  );
+
+  app.post<{ Params: { id: string; artifactId: string } }>(
+    "/api/sessions/:id/artifacts/:artifactId/export-factory",
+    async (req, reply) => {
+      try {
+        return await manager.exportArtifactToFactory(
+          req.params.id,
+          req.params.artifactId,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Export failed";
+        const code = message.includes("not found") ? 404 : 400;
+        return reply.code(code).send({ error: message });
+      }
+    },
   );
 
   app.get<{ Params: { id: string } }>(

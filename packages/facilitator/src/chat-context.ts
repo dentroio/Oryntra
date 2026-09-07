@@ -1,4 +1,7 @@
 import type { ChatMessage, ReviewArtifact } from "@oryntra/core";
+import type { ProcessFeedbackInput } from "./types.js";
+
+export type FactoryContextLine = { role: "user" | "agent"; content: string };
 
 export const MAX_CHAT_HISTORY = 30;
 
@@ -34,6 +37,29 @@ function formatRecentArtifacts(artifacts: ReviewArtifact[]): string {
   return lines.filter(Boolean).join("\n");
 }
 
+export function formatFactoryThreadForPrompt(
+  factoryThread?: FactoryContextLine[],
+): string {
+  if (!factoryThread || factoryThread.length === 0) return "";
+  return factoryThread
+    .slice(-40)
+    .map((msg) => {
+      const who = msg.role === "user" ? "Reviewer" : "Factory agent";
+      return `${who}: ${msg.content}`;
+    })
+    .join("\n");
+}
+
+export function transcriptFromFeedback(input: ProcessFeedbackInput) {
+  return {
+    transcript: input.transcript,
+    chatHistory: input.chatHistory,
+    artifacts: input.artifacts,
+    factoryThread: input.factoryThread,
+    factoryBinding: input.factoryBinding,
+  };
+}
+
 /**
  * Build facilitator context from prior chat + artifacts + the new message.
  * No phrase matching — every message gets prior context when history exists.
@@ -42,15 +68,18 @@ export function buildEffectiveTranscript(input: {
   transcript: string;
   chatHistory?: ChatMessage[];
   artifacts?: ReviewArtifact[];
+  factoryThread?: FactoryContextLine[];
+  factoryBinding?: { wo: string; agent?: string | null };
 }): FeedbackContext {
   const chatHistory = input.chatHistory ?? [];
   const artifacts = input.artifacts ?? [];
   const latestMessage = input.transcript.trim();
 
   const chatBlock = formatChatHistoryForPrompt(chatHistory);
+  const factoryBlock = formatFactoryThreadForPrompt(input.factoryThread);
   const artifactBlock = formatRecentArtifacts(artifacts);
   const hasConversationContext =
-    chatBlock.length > 0 || artifactBlock.length > 0;
+    chatBlock.length > 0 || factoryBlock.length > 0 || artifactBlock.length > 0;
 
   if (!hasConversationContext) {
     return {
@@ -61,6 +90,18 @@ export function buildEffectiveTranscript(input: {
   }
 
   const parts: string[] = [];
+  if (input.factoryBinding?.wo) {
+    const agent = input.factoryBinding.agent
+      ? ` (agent ${input.factoryBinding.agent})`
+      : "";
+    parts.push(
+      `This review continues factory work ${input.factoryBinding.wo}${agent}. Do not start over — use the factory thread below as memory.`,
+      "",
+    );
+  }
+  if (factoryBlock) {
+    parts.push("Factory agent thread so far:", factoryBlock, "");
+  }
   if (chatBlock) {
     parts.push("Conversation so far:", chatBlock, "");
   }

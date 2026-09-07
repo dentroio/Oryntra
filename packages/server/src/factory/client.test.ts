@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import {
   detectActiveWo,
+  factoryThreadAsContext,
   getThreadMessages,
+  listFactoryAgents,
+  listLiveWork,
   postThreadMessage,
 } from "./client.js";
 
@@ -116,4 +119,57 @@ test("getThreadMessages returns [] (not throws) on failure", async () => {
   mockFetch(() => new Response("nope", { status: 503 }));
   const messages = await getThreadMessages("WO-9");
   assert.deepEqual(messages, []);
+});
+
+test("listLiveWork returns only live WOs with the claiming agent, in_progress first", async () => {
+  mockFetch(() =>
+    Response.json({
+      "WO-1": {
+        wo: "WO-1",
+        status: "complete",
+        agent: "cursor",
+        claimed_at: "2026-08-01T00:00:00Z",
+      },
+      "WO-2": {
+        wo: "WO-2",
+        status: "claimed",
+        agent: "claude",
+        slug: "data-fix",
+        claimed_at: "2026-08-01T00:05:00Z",
+      },
+      "WO-3": {
+        wo: "WO-3",
+        status: "in_progress",
+        agent: "cursor",
+        backend: "cursor",
+        slug: "drawer-ui",
+        claimed_at: "2026-08-01T00:02:00Z",
+      },
+    }),
+  );
+  const live = await listLiveWork();
+  assert.equal(live.length, 2);
+  assert.equal(live[0]?.wo, "WO-3");
+  assert.equal(live[0]?.agent, "cursor");
+  assert.equal(live[1]?.wo, "WO-2");
+  assert.equal(live[1]?.agent, "claude");
+});
+
+test("listFactoryAgents returns [] when the factory is unreachable", async () => {
+  mockFetch(() => {
+    throw new TypeError("fetch failed");
+  });
+  const agents = await listFactoryAgents();
+  assert.deepEqual(agents, []);
+});
+
+test("factoryThreadAsContext maps human/agent roles and keeps author labels", () => {
+  const ctx = factoryThreadAsContext([
+    { author: "oryntra-reviewer", role: "human", type: "text", content: "drawer is wrong" },
+    { author: "cursor", role: "agent", type: "text", content: "I'll open a drawer instead" },
+  ]);
+  assert.equal(ctx[0]?.role, "user");
+  assert.match(ctx[0]?.content ?? "", /drawer is wrong/);
+  assert.equal(ctx[1]?.role, "agent");
+  assert.match(ctx[1]?.content ?? "", /cursor/);
 });

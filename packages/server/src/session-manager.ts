@@ -58,10 +58,15 @@ import {
 } from "@oryntra/workspace";
 import {
   detectActiveWo,
+  factoryThreadAsContext,
+  getDispatchEntry,
   getThreadMessages,
+  listFactoryAgents,
+  listLiveWork,
   postThreadMessage,
   type FactoryThreadMessage,
 } from "./factory/client.js";
+import { exportArtifactToFactory } from "./factory/export.js";
 import {
   archiveAgentThreadHistory,
   createAgentThreadRecord,
@@ -387,15 +392,84 @@ export class SessionManager {
   async setFactoryWo(sessionId: string, wo: string | null): Promise<ReviewSession> {
     const runtime = await this.ensureRuntime(sessionId);
     runtime.session.factoryWo = wo;
+    runtime.session.factoryAgent = null;
+    runtime.session.factoryBackend = null;
+    runtime.session.factorySlug = null;
+    if (wo) {
+      const live = await getDispatchEntry(wo);
+      if (live) {
+        runtime.session.factoryAgent = live.agent || null;
+        runtime.session.factoryBackend = live.backend || null;
+        runtime.session.factorySlug = live.slug || null;
+      }
+    }
     runtime.session.updatedAt = new Date().toISOString();
     this.store.saveSession(runtime.session);
-    this.broadcast(sessionId, { type: "factory_binding", factoryWo: wo });
+    this.broadcast(sessionId, {
+      type: "factory_binding",
+      factoryWo: wo,
+      factoryAgent: runtime.session.factoryAgent ?? null,
+      factoryBackend: runtime.session.factoryBackend ?? null,
+      factorySlug: runtime.session.factorySlug ?? null,
+    });
     return runtime.session;
   }
 
   /** WO-1047 — "Auto-detect" action: best-effort, does not bind on its own. */
   async detectFactoryWo(): Promise<string | null> {
     return detectActiveWo();
+  }
+
+  listFactoryLiveWork() {
+    return listLiveWork();
+  }
+
+  listFactoryAgents() {
+    return listFactoryAgents();
+  }
+
+  async getFactoryContext(sessionId: string): Promise<{
+    factoryWo: string | null;
+    factoryAgent: string | null;
+    factoryBackend: string | null;
+    factorySlug: string | null;
+    thread: FactoryThreadMessage[];
+  }> {
+    const session = this.getSession(sessionId);
+    if (!session?.factoryWo) {
+      return {
+        factoryWo: null,
+        factoryAgent: null,
+        factoryBackend: null,
+        factorySlug: null,
+        thread: [],
+      };
+    }
+    const thread = await getThreadMessages(session.factoryWo);
+    return {
+      factoryWo: session.factoryWo,
+      factoryAgent: session.factoryAgent ?? null,
+      factoryBackend: session.factoryBackend ?? null,
+      factorySlug: session.factorySlug ?? null,
+      thread,
+    };
+  }
+
+  async exportArtifactToFactory(sessionId: string, artifactId: string) {
+    const session = this.getSession(sessionId);
+    if (!session) throw new Error(`Session not found: ${sessionId}`);
+    const artifact = this.listArtifacts(sessionId).find((a) => a.id === artifactId);
+    if (!artifact) throw new Error(`Artifact not found: ${artifactId}`);
+    const result = await exportArtifactToFactory(artifact, session);
+    if (result.ok && result.woId && artifact.kind !== "doc_update" && artifact.kind !== "architecture_update") {
+      const updated = { ...artifact, factoryWoId: result.woId };
+      this.saveArtifact(updated);
+      if (!session.factoryWo) {
+        await this.setFactoryWo(sessionId, result.woId);
+      }
+      return { ...result, artifact: updated };
+    }
+    return { ...result, artifact };
   }
 
   /** WO-1047 — read path: latest factory thread messages for a bound session's WO. */
@@ -564,6 +638,9 @@ export class SessionManager {
       .filter((m) => m.id !== userMessage.id)
       .slice(-30);
     const cursorChatId = await this.resolveCursorChatId(sessionId, config);
+    const factoryThread = session.factoryWo
+      ? factoryThreadAsContext(await getThreadMessages(session.factoryWo))
+      : undefined;
     const facilitatorResponse = await this.facilitator.processFeedback({
       moment,
       transcript,
@@ -572,6 +649,10 @@ export class SessionManager {
       artifacts: this.listArtifacts(sessionId),
       cursorChatId,
       reviewRoomUrl: this.reviewRoomUrl(sessionId),
+      factoryThread,
+      factoryBinding: session.factoryWo
+        ? { wo: session.factoryWo, agent: session.factoryAgent }
+        : undefined,
     });
 
     if (facilitatorResponse.delegatedToIde) {
@@ -592,6 +673,10 @@ export class SessionManager {
         session,
         chatHistory,
         artifacts: this.listArtifacts(sessionId),
+        factoryThread,
+        factoryBinding: session.factoryWo
+          ? { wo: session.factoryWo, agent: session.factoryAgent }
+          : undefined,
       });
     } else if (facilitatorResponse.suggestedArtifacts?.length) {
       moment = { ...moment, ideStatus: "processed" };
@@ -1120,6 +1205,8 @@ export class SessionManager {
       session: ReviewSession;
       chatHistory: ChatMessage[];
       artifacts: ReviewArtifact[];
+      factoryThread?: { role: "user" | "agent"; content: string }[];
+      factoryBinding?: { wo: string; agent?: string | null };
     },
   ): void {
     const key = this.ideFallbackKey(sessionId, momentId);
@@ -1152,6 +1239,8 @@ export class SessionManager {
       session: ReviewSession;
       chatHistory: ChatMessage[];
       artifacts: ReviewArtifact[];
+      factoryThread?: { role: "user" | "agent"; content: string }[];
+      factoryBinding?: { wo: string; agent?: string | null };
     },
   ): Promise<void> {
     this.ideFallbackTimers.delete(this.ideFallbackKey(sessionId, momentId));
@@ -1171,6 +1260,8 @@ export class SessionManager {
         chatHistory: input.chatHistory,
         artifacts: input.artifacts,
         reviewRoomUrl: this.reviewRoomUrl(sessionId),
+        factoryThread: input.factoryThread,
+        factoryBinding: input.factoryBinding,
       });
 
       this.submitIdeAgentResponse(sessionId, {

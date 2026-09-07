@@ -1,5 +1,5 @@
 import { createId, type FacilitatorResponse, type ReviewArtifact } from "@oryntra/core";
-import { buildEffectiveTranscript } from "./chat-context.js";
+import { buildEffectiveTranscript, transcriptFromFeedback } from "./chat-context.js";
 import {
   buildArtifactCopy,
   detectScenario,
@@ -17,11 +17,7 @@ const DOC = /\b(doc|documentation|spec|architecture|readme)\b/i;
 export class StubReviewFacilitator implements ReviewFacilitator {
   async processFeedback(input: ProcessFeedbackInput): Promise<FacilitatorResponse> {
     const { moment, transcript, session } = input;
-    const context = buildEffectiveTranscript({
-      transcript,
-      chatHistory: input.chatHistory,
-      artifacts: input.artifacts,
-    });
+    const context = buildEffectiveTranscript(transcriptFromFeedback(input));
     const effectiveTranscript = context.effectiveTranscript;
     const element =
       moment.spatial.lockedElement ??

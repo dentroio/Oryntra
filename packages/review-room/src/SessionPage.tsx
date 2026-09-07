@@ -509,7 +509,17 @@ export function SessionPage() {
           );
           break;
         case "factory_binding":
-          setSession((prev) => (prev ? { ...prev, factoryWo: data.factoryWo } : prev));
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  factoryWo: data.factoryWo,
+                  factoryAgent: data.factoryAgent,
+                  factoryBackend: data.factoryBackend,
+                  factorySlug: data.factorySlug,
+                }
+              : prev,
+          );
           setFactoryRelayWarning(null);
           break;
         case "factory_relay_status":
@@ -982,9 +992,21 @@ export function SessionPage() {
             <FactoryPanel
               sessionId={sessionId ?? ""}
               factoryWo={session?.factoryWo}
+              factoryAgent={session?.factoryAgent}
+              factorySlug={session?.factorySlug}
               relayWarning={factoryRelayWarning}
-              onBindingChanged={(wo) =>
-                setSession((prev) => (prev ? { ...prev, factoryWo: wo } : prev))
+              onBindingChanged={(binding) =>
+                setSession((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        factoryWo: binding.factoryWo,
+                        factoryAgent: binding.factoryAgent,
+                        factoryBackend: binding.factoryBackend,
+                        factorySlug: binding.factorySlug,
+                      }
+                    : prev,
+                )
               }
             />
             <div className="side-chat">

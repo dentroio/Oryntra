@@ -18,7 +18,57 @@ export type FactoryDispatchEntry = {
   wo: string;
   status: FactoryDispatchStatus;
   claimed_at?: string | null;
+  agent?: string;
+  backend?: string;
+  slug?: string;
+  step?: string;
+  pr_url?: string;
+  workstation?: string;
+  last_seen?: string;
   [key: string]: unknown;
+};
+
+export const LIVE_DISPATCH_STATUSES: ReadonlySet<FactoryDispatchStatus> = new Set([
+  "claimed",
+  "in_progress",
+  "awaiting_human",
+  "awaiting_commit",
+]);
+
+export type FactoryLiveWork = {
+  wo: string;
+  status: FactoryDispatchStatus;
+  agent: string;
+  backend: string;
+  slug: string;
+  step: string;
+  prUrl: string;
+  claimedAt: string | null;
+};
+
+export type FactoryAgentInfo = {
+  name: string;
+  domainFilter: string;
+  daemonLoaded: boolean;
+  daemonPid: number | null;
+  cliDetected: boolean;
+};
+
+export type CreateFactoryWoInput = {
+  title: string;
+  priority?: "P0" | "P1" | "P2" | "P3";
+  services?: string;
+  problem: string;
+  whatToBuild: string;
+  acceptanceCriteria: string[];
+  notes?: string;
+};
+
+export type CreateFactoryWoResult = {
+  ok: boolean;
+  woId?: string;
+  url?: string;
+  error?: string;
 };
 
 /** Flat map { wo_id: entry } — there is no `dispatch_state` wrapper. That
@@ -81,6 +131,157 @@ export async function detectActiveWo(
   } catch {
     return null;
   }
+}
+
+function liveWorkFromEntry(wo: string, entry: FactoryDispatchEntry): FactoryLiveWork {
+  return {
+    wo: entry.wo || wo,
+    status: entry.status,
+    agent: typeof entry.agent === "string" ? entry.agent : "",
+    backend: typeof entry.backend === "string" ? entry.backend : "",
+    slug: typeof entry.slug === "string" ? entry.slug : "",
+    step: typeof entry.step === "string" ? entry.step : "",
+    prUrl: typeof entry.pr_url === "string" ? entry.pr_url : "",
+    claimedAt: entry.claimed_at ?? null,
+  };
+}
+
+const LIVE_STATUS_RANK: Record<string, number> = {
+  in_progress: 0,
+  claimed: 1,
+  awaiting_human: 2,
+  awaiting_commit: 3,
+};
+
+/** All currently live factory WOs, with the agent that claimed each one. */
+export async function listLiveWork(
+  factoryUrlOverride?: string | null,
+): Promise<FactoryLiveWork[]> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/dispatch`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return [];
+    const dispatch = (await res.json()) as FactoryDispatchMap;
+    return Object.entries(dispatch)
+      .filter(([, entry]) => LIVE_DISPATCH_STATUSES.has(entry.status))
+      .map(([wo, entry]) => liveWorkFromEntry(wo, entry))
+      .sort((a, b) => {
+        const rank = (LIVE_STATUS_RANK[a.status] ?? 9) - (LIVE_STATUS_RANK[b.status] ?? 9);
+        if (rank !== 0) return rank;
+        return (b.claimedAt ?? "").localeCompare(a.claimedAt ?? "");
+      });
+  } catch {
+    return [];
+  }
+}
+
+export async function getDispatchEntry(
+  wo: string,
+  factoryUrlOverride?: string | null,
+): Promise<FactoryLiveWork | null> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/dispatch`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const dispatch = (await res.json()) as FactoryDispatchMap;
+    const entry = dispatch[wo];
+    if (!entry) return null;
+    return liveWorkFromEntry(wo, entry);
+  } catch {
+    return null;
+  }
+}
+
+/** Installed factory runners (cursor/claude/codex/gemini) and their domain filters. */
+export async function listFactoryAgents(
+  factoryUrlOverride?: string | null,
+): Promise<FactoryAgentInfo[]> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/agents`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+      agents?: Record<
+        string,
+        {
+          domain_filter?: string;
+          daemon_loaded?: boolean;
+          daemon_pid?: number | null;
+          cli_detected?: boolean;
+        }
+      >;
+    };
+    return Object.entries(body.agents ?? {}).map(([name, info]) => ({
+      name,
+      domainFilter: info.domain_filter ?? "",
+      daemonLoaded: Boolean(info.daemon_loaded),
+      daemonPid: info.daemon_pid ?? null,
+      cliDetected: Boolean(info.cli_detected),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function createFactoryWo(
+  input: CreateFactoryWoInput,
+  factoryUrlOverride?: string | null,
+): Promise<CreateFactoryWoResult> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/wos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: input.title,
+        priority: input.priority ?? "P2",
+        services: input.services ?? "frontend",
+        problem: input.problem,
+        what_to_build: input.whatToBuild,
+        acceptance_criteria: input.acceptanceCriteria,
+        notes: input.notes ?? "",
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const body = (await res.json().catch(() => ({}))) as {
+      wo_number?: number | string;
+      url?: string;
+      error?: string;
+    };
+    if (!res.ok) {
+      return { ok: false, error: body.error ?? `factory responded ${res.status}` };
+    }
+    const number = body.wo_number;
+    const woId =
+      typeof number === "number" || typeof number === "string"
+        ? `WO-${number}`
+        : undefined;
+    return { ok: true, woId, url: body.url };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "create WO failed",
+    };
+  }
+}
+
+/** Turn factory thread messages into facilitator/MCP context (does not mutate local chat). */
+export function factoryThreadAsContext(
+  messages: FactoryThreadMessage[],
+): { role: "user" | "agent"; content: string }[] {
+  return messages
+    .filter((m) => (m.content ?? "").trim().length > 0 || m.type === "image")
+    .map((m) => {
+      const role: "user" | "agent" = m.role === "human" ? "user" : "agent";
+      const who = m.author ? `${m.author}` : role;
+      const body =
+        m.type === "image" && !m.content
+          ? `(screenshot ${m.image_url ?? "attached"})`
+          : m.content;
+      return { role, content: `[${who}] ${body}` };
+    });
 }
 
 export type PostThreadMessageResult = {

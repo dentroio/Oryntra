@@ -1023,6 +1023,56 @@ code {
   margin: 6px 0 0;
 }
 
+.factory-mode-hint {
+  color: #a8b3c7;
+  font-size: 0.78rem;
+  margin: 8px 0 0;
+  line-height: 1.35;
+}
+
+.factory-live-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.factory-live-heading {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b8496;
+}
+
+.factory-live-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  background: #0e131b;
+  border: 1px solid #2a3344;
+  border-radius: 6px;
+  color: #e8eaed;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.factory-live-item:hover:not(:disabled) {
+  border-color: #35588a;
+}
+
+.factory-live-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.75rem;
+}
+
+.factory-empty-live {
+  margin-top: 8px;
+  font-size: 0.78rem;
+}
+
 .factory-bind-form {
   display: flex;
   flex-direction: column;

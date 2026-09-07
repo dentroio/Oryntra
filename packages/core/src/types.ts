@@ -61,6 +61,12 @@ export type ReviewSession = {
   facilitatorProvider?: string;
   /** Agentic-factory WO this session is bound to, e.g. "WO-1047". Null/undefined = unbound. */
   factoryWo?: string | null;
+  /** Runner that claimed the bound WO, e.g. "cursor" or "claude-runner". */
+  factoryAgent?: string | null;
+  /** Backend the bound runner is using: cursor | claude | codex | gemini. */
+  factoryBackend?: string | null;
+  /** WO slug from dispatch, when known. */
+  factorySlug?: string | null;
 };
 
 export type ElementRef = {
@@ -187,6 +193,8 @@ export type ChangeRequest = {
   feedbackMomentIds: string[];
   browserEvidence: BrowserEvent[];
   codeEvidence?: CodeReference[];
+  /** Factory WO created from this artifact (WO-1048 idempotency). */
+  factoryWoId?: string;
 };
 
 export type WorkOrderTask = {
@@ -207,6 +215,8 @@ export type WorkOrder = {
   acceptanceCriteria: string[];
   feedbackMomentIds: string[];
   status: ArtifactStatus;
+  /** Factory WO created from this artifact (WO-1048 idempotency). */
+  factoryWoId?: string;
 };
 
 export type DocUpdate = {
@@ -307,7 +317,13 @@ export type ServerMessage =
       activeThread: AgentThread;
       threads: AgentThread[];
     }
-  | { type: "factory_binding"; factoryWo: string | null }
+  | {
+      type: "factory_binding";
+      factoryWo: string | null;
+      factoryAgent?: string | null;
+      factoryBackend?: string | null;
+      factorySlug?: string | null;
+    }
   | { type: "factory_relay_status"; ok: boolean; error?: string };
 
 export type CreateSessionRequest = {
