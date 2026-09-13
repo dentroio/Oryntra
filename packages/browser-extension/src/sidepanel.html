@@ -6,26 +6,30 @@
     <title>Oryntra Review</title>
     <style>
       * { box-sizing: border-box; }
-      body {
+      html, body {
+        height: 100%;
         margin: 0;
+      }
+      body {
         font-family: system-ui, -apple-system, sans-serif;
         background: #0f1117;
         color: #e6edf3;
         display: flex;
         flex-direction: column;
-        height: 100vh;
+        overflow: hidden;
       }
       header {
-        padding: 10px 12px;
+        flex-shrink: 0;
+        padding: 10px 12px 8px;
         border-bottom: 1px solid #30363d;
         background: #161b22;
       }
       header h1 {
-        margin: 0 0 6px;
+        margin: 0;
         font-size: 14px;
         font-weight: 600;
       }
-      .meta { font-size: 11px; color: #8b949e; }
+      .meta { font-size: 11px; color: #8b949e; margin-top: 6px; }
       .ide-bar {
         display: flex;
         flex-wrap: wrap;
@@ -50,9 +54,11 @@
       }
       .toolbar {
         display: flex;
-        gap: 8px;
+        flex-wrap: wrap;
+        gap: 6px;
         padding: 8px 12px;
         border-bottom: 1px solid #30363d;
+        flex-shrink: 0;
       }
       button {
         cursor: pointer;
@@ -67,67 +73,277 @@
         background: #238636;
         border-color: #238636;
       }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      button.active {
+        border-color: #58a6ff;
+        color: #9cc4ff;
+      }
       .status {
+        padding: 6px 12px;
+        font-size: 12px;
+        color: #8b949e;
+        flex-shrink: 0;
+      }
+      .status.error { color: #f85149; }
+      .route-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 0 12px 8px;
+        flex-shrink: 0;
+      }
+      .pill {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #1c2230;
+        color: #a8b3c7;
+        border: 1px solid #2a3344;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .pill.accent {
+        background: #1a2740;
+        color: #9cc4ff;
+        border-color: #35588a;
+      }
+      .modes {
+        display: flex;
+        gap: 4px;
+        padding: 0 12px 8px;
+        flex-shrink: 0;
+      }
+      .modes button { padding: 4px 8px; font-size: 11px; }
+      .banner {
+        margin: 0 12px 8px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: #1a2740;
+        border: 1px solid #35588a;
+        font-size: 12px;
+        display: none;
+      }
+      .banner.show { display: block; }
+      .chat-stream {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 8px 12px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .hint {
+        color: #8b949e;
+        font-size: 12px;
+        line-height: 1.45;
+        margin: 8px 0;
+      }
+      .msg {
+        max-width: 100%;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .msg p { margin: 0 0 6px; }
+      .msg p:last-child { margin-bottom: 0; }
+      .msg-user {
+        align-self: flex-end;
+        background: #1f6feb;
+        color: #fff;
+      }
+      .msg-agent {
+        align-self: flex-start;
+        background: #21262d;
+        border: 1px solid #30363d;
+      }
+      .proposal {
+        align-self: stretch;
+        padding: 8px;
+        border: 1px solid #3d4a5c;
+        border-radius: 8px;
+        background: #161b22;
+        font-size: 12px;
+      }
+      .proposal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .composer {
+        flex-shrink: 0;
+        border-top: 1px solid #30363d;
+        padding: 8px 12px 10px;
+        background: #161b22;
+      }
+      .composer textarea {
+        width: 100%;
+        resize: none;
+        background: #0e131b;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #e6edf3;
+        padding: 8px;
+        font-size: 13px;
+        font-family: inherit;
+      }
+      .composer-actions {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .snap-preview {
+        display: none;
+        margin-bottom: 6px;
+        font-size: 11px;
+        color: #8b949e;
+      }
+      .snap-preview.show { display: block; }
+      .snap-preview img {
+        display: block;
+        max-width: 100%;
+        max-height: 80px;
+        border-radius: 4px;
+        margin-top: 4px;
+        border: 1px solid #30363d;
+      }
+      .factory-strip {
+        flex-shrink: 0;
         padding: 8px 12px;
+        border-bottom: 1px solid #30363d;
+        background: #12151c;
+      }
+      .factory-line {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        color: #c9d1d9;
+      }
+      .factory-bind {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .factory-bind input {
+        flex: 1;
+        min-width: 0;
+        background: #0e131b;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #e6edf3;
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+      .factory-live {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .factory-live button {
+        font-size: 11px;
+        padding: 3px 8px;
+      }
+      details.more {
+        flex-shrink: 0;
+        padding: 4px 12px 10px;
+        border-top: 1px solid #30363d;
         font-size: 12px;
         color: #8b949e;
       }
-      .status.error { color: #f85149; }
-      iframe {
-        flex: 1;
-        border: 0;
-        width: 100%;
-        min-height: 0;
-        background: #0d1117;
-      }
-      body.review-active header,
-      body.review-active .toolbar,
-      body.review-active .status {
-        display: none;
-      }
-      .review-bar {
-        display: none;
-        justify-content: flex-end;
-        padding: 4px 8px;
-        border-bottom: 1px solid #30363d;
-        background: #161b22;
-      }
-      body.review-active .review-bar {
-        display: flex;
-      }
-      .panel-frame {
-        flex: 1;
-        min-height: 0;
+      details.more summary { cursor: pointer; }
+      .field {
         display: flex;
         flex-direction: column;
+        gap: 4px;
+        margin-top: 8px;
       }
-      body.review-active iframe {
-        flex: 1;
-        min-height: 0;
+      .field label { font-size: 11px; color: #8b949e; }
+      .field input {
+        width: 100%;
+        background: #0e131b;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #e6edf3;
+        padding: 6px 8px;
+        font-size: 12px;
       }
     </style>
   </head>
   <body>
     <header>
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-        <img src="oryntra.jpg" alt="Oryntra Logo" style="width: 20px; height: 20px; border-radius: 4px; object-fit: cover;" />
-        <h1 style="margin: 0; font-size: 14px; font-weight: 600;">Oryntra Review</h1>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <img src="oryntra.png" alt="" style="width: 22px; height: 22px; border-radius: 6px; object-fit: contain;" />
+        <h1>Oryntra Review</h1>
       </div>
-      <div class="meta" id="session-meta">Not connected — configure below</div>
+      <div class="meta" id="session-meta">Stay on Clarion, then Start review</div>
       <div class="ide-bar" id="ide-bar"></div>
     </header>
     <div class="toolbar">
       <button class="primary" id="start-btn">Start review</button>
-      <button id="refresh-btn">Refresh IDEs</button>
-      <button id="options-btn">Settings</button>
+      <button type="button" id="refresh-btn">Refresh IDEs</button>
+      <button type="button" id="options-btn">Settings</button>
+      <button type="button" id="open-studio-btn" title="Optional — factory panel and full history">Full studio</button>
     </div>
-    <div class="status" id="status"></div>
-    <div class="review-bar">
-      <button type="button" id="settings-fab" title="Extension settings">Settings</button>
+    <div class="status" id="status">Chat stays in this panel. Clarion stays in the tab.</div>
+    <div class="factory-strip" id="factory-strip" hidden>
+      <div class="factory-line">
+        <span id="factory-label">Scratch review</span>
+        <button type="button" id="factory-unbind-btn" hidden>Unbind</button>
+      </div>
+      <div class="factory-bind" id="factory-bind">
+        <input id="factory-wo" placeholder="WO-1080" spellcheck="false" />
+        <button type="button" id="factory-bind-btn">Bind WO</button>
+      </div>
+      <div class="factory-live" id="factory-live"></div>
     </div>
-    <div class="panel-frame">
-      <iframe id="review-frame" title="Review Studio"></iframe>
+    <div class="route-row" id="route-row" hidden>
+      <span class="pill" id="route-pill">/</span>
+      <span class="pill accent" id="clicked-pill" hidden></span>
     </div>
+    <div class="modes" id="mode-bar" hidden>
+      <button type="button" data-mode="normal" class="active">Normal</button>
+      <button type="button" data-mode="explain_click">Explain click</button>
+      <button type="button" data-mode="element_picker">Pick element</button>
+    </div>
+    <div class="banner" id="implement-banner"></div>
+    <div class="chat-stream" id="chat-stream">
+      <p class="hint" id="chat-empty">
+        Stay on Clarion and click Start review. Then click the UI and describe
+        what should change — without leaving this panel.
+      </p>
+    </div>
+    <form class="composer" id="composer" hidden>
+      <div class="snap-preview" id="snap-preview"></div>
+      <textarea
+        id="feedback"
+        rows="3"
+        placeholder="Click Clarion, then describe what should change…"
+      ></textarea>
+      <div class="composer-actions">
+        <button type="button" id="snap-btn">Snap</button>
+        <button type="button" id="mic-btn">Mic</button>
+        <button type="submit" id="send-btn" class="primary" disabled>Send</button>
+      </div>
+    </form>
+    <details class="more">
+      <summary>Workspace</summary>
+      <div class="field">
+        <label for="workspace-path">Workspace path</label>
+        <input id="workspace-path" spellcheck="false" />
+      </div>
+    </details>
     <script src="sidepanel.js"></script>
   </body>
 </html>

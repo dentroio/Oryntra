@@ -27,14 +27,14 @@
   </head>
   <body>
     <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-      <img src="oryntra.jpg" alt="Oryntra Logo" style="width: 48px; height: 48px; border-radius: 8px; object-fit: cover;" />
+      <img src="oryntra.png" alt="Oryntra" style="width: 48px; height: 48px; border-radius: 12px; object-fit: contain;" />
       <h1 style="margin: 0; font-size: 24px; font-weight: 700;">Oryntra Extension Settings</h1>
     </div>
     <p>Point the extension at your project workspace and default app URL.</p>
     <label for="workspacePath">Workspace path</label>
-    <input id="workspacePath" placeholder="/Users/you/projects/clarion" />
-    <label for="appUrl">App URL (optional — defaults to active tab)</label>
-    <input id="appUrl" placeholder="http://localhost:3000" />
+    <input id="workspacePath" placeholder="/Users/you/workspace/github/sgerhart/clarion" />
+    <label for="appUrl">App URL (optional — defaults to the active tab)</label>
+    <input id="appUrl" placeholder="https://clarion.netlab.net" />
     <label for="preferredIde">Preferred IDE for handoff</label>
     <select id="preferredIde">
       <option value="cursor">Cursor</option>

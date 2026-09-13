@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 type FactoryThreadMessage = {
   id?: string;
@@ -10,28 +10,69 @@ type FactoryThreadMessage = {
   timestamp?: string;
 };
 
+type FactoryParticipant = {
+  name: string;
+  role: "implementer" | "reviewer" | "agent" | "human" | "system";
+};
+
+type LiveWork = {
+  wo: string;
+  status: string;
+  agent: string;
+  backend: string;
+  slug: string;
+  step: string;
+  prUrl: string;
+  claimedAt: string | null;
+};
+
+type FactoryAgent = {
+  name: string;
+  domainFilter: string;
+  daemonLoaded: boolean;
+};
+
 type Props = {
   sessionId: string;
   factoryWo: string | null | undefined;
+  factoryAgent?: string | null;
+  factorySlug?: string | null;
+  factoryAddressedTo?: string | null;
   relayWarning: string | null;
-  onBindingChanged: (wo: string | null) => void;
+  onBindingChanged: (binding: {
+    factoryWo: string | null;
+    factoryAgent?: string | null;
+    factoryBackend?: string | null;
+    factorySlug?: string | null;
+    factoryAddressedTo?: string | null;
+  }) => void;
 };
 
 const POLL_MS = 5000;
 
+function labelForWork(item: LiveWork): string {
+  const agent = item.agent || "unclaimed";
+  const slug = item.slug ? ` · ${item.slug}` : "";
+  return `${agent} · ${item.wo}${slug}`;
+}
+
 export function FactoryPanel({
   sessionId,
   factoryWo,
+  factoryAgent,
+  factorySlug,
+  factoryAddressedTo,
   relayWarning,
   onBindingChanged,
 }: Props) {
   const [manualWo, setManualWo] = useState("");
-  const [detecting, setDetecting] = useState(false);
   const [binding, setBinding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveWork, setLiveWork] = useState<LiveWork[]>([]);
+  const [agents, setAgents] = useState<FactoryAgent[]>([]);
   const [messages, setMessages] = useState<FactoryThreadMessage[]>([]);
-  const [expanded, setExpanded] = useState(false);
-  const sinceRef = useRef<string | undefined>(undefined);
+  const [participants, setParticipants] = useState<FactoryParticipant[]>([]);
+  const [threadOpen, setThreadOpen] = useState(true);
 
   async function bind(wo: string | null) {
     setBinding(true);
@@ -43,7 +84,20 @@ export function FactoryPanel({
         body: JSON.stringify({ wo }),
       });
       if (!res.ok) throw new Error("Bind failed");
-      onBindingChanged(wo);
+      const session = (await res.json()) as {
+        factoryWo?: string | null;
+        factoryAgent?: string | null;
+        factoryBackend?: string | null;
+        factorySlug?: string | null;
+        factoryAddressedTo?: string | null;
+      };
+      onBindingChanged({
+        factoryWo: session.factoryWo ?? wo,
+        factoryAgent: session.factoryAgent ?? null,
+        factoryBackend: session.factoryBackend ?? null,
+        factorySlug: session.factorySlug ?? null,
+        factoryAddressedTo: session.factoryAddressedTo ?? null,
+      });
       setManualWo("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Bind failed");
@@ -52,44 +106,70 @@ export function FactoryPanel({
     }
   }
 
-  async function autoDetect() {
-    setDetecting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/factory/detect-active-wo");
-      const body = (await res.json()) as { wo: string | null };
-      if (!body.wo) {
-        setError("No active WO found on the factory right now.");
-        return;
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshRoster() {
+      try {
+        const [workRes, agentRes] = await Promise.all([
+          fetch("/api/factory/live-work"),
+          fetch("/api/factory/agents"),
+        ]);
+        if (cancelled) return;
+        if (workRes.ok) {
+          setLiveWork((await workRes.json()) as LiveWork[]);
+        }
+        if (agentRes.ok) {
+          setAgents((await agentRes.json()) as FactoryAgent[]);
+        }
+      } catch {
+        // Factory optional — scratch review still works.
       }
-      await bind(body.wo);
+    }
+    void refreshRoster();
+    const interval = setInterval(() => void refreshRoster(), POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  async function address(agent: string) {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/factory-address`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent }),
+      });
+      if (!res.ok) return;
+      const session = (await res.json()) as { factoryAddressedTo?: string | null };
+      onBindingChanged({
+        factoryWo: factoryWo ?? null,
+        factoryAgent,
+        factorySlug,
+        factoryAddressedTo: session.factoryAddressedTo ?? agent,
+      });
     } catch {
-      setError("Could not reach the factory.");
-    } finally {
-      setDetecting(false);
+      // Keep local review usable if the factory address call fails.
     }
   }
 
-  // Read path: poll the bound WO's thread for agent replies (WO-1047).
   useEffect(() => {
-    sinceRef.current = undefined;
     setMessages([]);
-    if (!factoryWo) return;
+    setParticipants([]);
+    if (!factoryWo || !sessionId) return;
 
     let cancelled = false;
     async function poll() {
       try {
-        const url = new URL(
-          `/api/sessions/${sessionId}/factory-thread`,
-          window.location.origin,
-        );
-        if (sinceRef.current) url.searchParams.set("since", sinceRef.current);
-        const res = await fetch(url);
+        const res = await fetch(`/api/sessions/${sessionId}/factory-context`);
         if (!res.ok || cancelled) return;
-        const fresh = (await res.json()) as FactoryThreadMessage[];
-        if (fresh.length === 0 || cancelled) return;
-        sinceRef.current = fresh[fresh.length - 1]?.id ?? sinceRef.current;
-        setMessages((prev) => [...prev, ...fresh].slice(-50));
+        const body = (await res.json()) as {
+          thread?: FactoryThreadMessage[];
+          participants?: FactoryParticipant[];
+        };
+        if (cancelled) return;
+        setMessages((body.thread ?? []).slice(-80));
+        setParticipants(body.participants ?? []);
       } catch {
         // Transient — next poll tick will retry.
       }
@@ -103,41 +183,164 @@ export function FactoryPanel({
     };
   }, [sessionId, factoryWo]);
 
-  const agentReplies = messages.filter((m) => m.role !== "human");
+  const otherLive = liveWork.filter((item) => item.wo !== factoryWo);
+  const loadedAgents = agents.filter((a) => a.daemonLoaded);
+  const talkingTo = factoryAddressedTo || factoryAgent;
+  const roster = (() => {
+    const byName = new Map<string, FactoryParticipant>();
+    for (const person of participants) byName.set(person.name, person);
+    if (factoryAgent && !byName.has(factoryAgent)) {
+      byName.set(factoryAgent, { name: factoryAgent, role: "implementer" });
+    }
+    if (factoryAddressedTo && !byName.has(factoryAddressedTo)) {
+      byName.set(factoryAddressedTo, { name: factoryAddressedTo, role: "agent" });
+    }
+    for (const agent of loadedAgents) {
+      if (!byName.has(agent.name)) {
+        byName.set(agent.name, { name: agent.name, role: "agent" });
+      }
+    }
+    return [...byName.values()];
+  })();
 
   return (
     <div className="factory-panel">
       <div className="factory-panel-header">
         <span className="factory-panel-title">Factory</span>
         {factoryWo ? (
-          <span className="tag factory-wo-tag">{factoryWo}</span>
+          <span className="tag factory-wo-tag">
+            {talkingTo ? `${talkingTo} · ${factoryWo}` : factoryWo}
+          </span>
         ) : (
-          <span className="muted">Not bound</span>
+          <span className="muted">Scratch review</span>
         )}
       </div>
 
+      {factoryWo ? (
+        <p className="factory-mode-hint">
+          Correcting {talkingTo || "the claiming agent"} on {factoryWo}
+          {factorySlug ? ` (${factorySlug})` : ""}. Pick a participant to
+          address; feedback stays on this WO thread.
+        </p>
+      ) : (
+        <p className="factory-mode-hint">
+          {loadedAgents.length > 0
+            ? `${loadedAgents.map((a) => a.name).join(" and ")} can claim new work. Describe a change, approve it, then Send to Factory.`
+            : "No factory runner is online. You can still review locally; Send to Factory queues a WO when a runner is back."}
+        </p>
+      )}
+
       {relayWarning ? (
         <p className="factory-relay-warning" title={relayWarning}>
-          ⚠ Feedback relay to factory failed — review continues locally.
+          Feedback relay to factory failed — review continues locally.
         </p>
       ) : null}
 
       {error ? <p className="error-text">{error}</p> : null}
 
-      {!factoryWo ? (
-        <div className="factory-bind-form">
+      {otherLive.length > 0 ? (
+        <div className="factory-live-list">
+          <div className="factory-live-heading">Live agents</div>
+          {otherLive.map((item) => (
+            <button
+              key={item.wo}
+              type="button"
+              className="factory-live-item"
+              disabled={binding}
+              onClick={() => void bind(item.wo)}
+            >
+              <span className="factory-live-label">{labelForWork(item)}</span>
+              <span className="muted">{item.status}</span>
+            </button>
+          ))}
+        </div>
+      ) : loadedAgents.length > 0 && !factoryWo ? (
+        <div className="factory-roster">
+          <div className="factory-live-heading">Available for new updates</div>
+          <div className="factory-roster-chips">
+            {loadedAgents.map((agent) => (
+              <span key={agent.name} className="factory-roster-chip idle">
+                {agent.name}
+                <span className="muted"> idle</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {factoryWo ? (
+        <div className="factory-bound">
+          {roster.length > 0 ? (
+            <div className="factory-roster">
+              <div className="factory-live-heading">Agents on this change</div>
+              <div className="factory-roster-chips">
+                {roster.map((person) => (
+                  <button
+                    key={person.name}
+                    type="button"
+                    className={`factory-roster-chip${
+                      talkingTo === person.name ? " active" : ""
+                    }`}
+                    disabled={binding}
+                    onClick={() => void address(person.name)}
+                  >
+                    {person.name}
+                    <span className="muted"> {person.role}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <button
             type="button"
-            className="secondary"
-            disabled={detecting || binding}
-            onClick={() => void autoDetect()}
+            className="secondary factory-unbind-btn"
+            disabled={binding}
+            onClick={() => void bind(null)}
           >
-            {detecting ? "Detecting…" : "Auto-detect"}
+            Unbind — scratch review
           </button>
+
+          {messages.length > 0 ? (
+            <div className="factory-agent-strip">
+              <button
+                type="button"
+                className="factory-agent-strip-toggle"
+                onClick={() => setThreadOpen((v) => !v)}
+                aria-expanded={threadOpen}
+              >
+                {threadOpen ? "▾" : "▸"} Agent memory ({messages.length})
+              </button>
+              {threadOpen ? (
+                <ul className="factory-agent-strip-list">
+                  {messages.slice(-20).map((m, i) => (
+                    <li key={m.id ?? i}>
+                      <span className="factory-agent-strip-author">
+                        {m.author || m.role}:
+                      </span>{" "}
+                      {m.type === "image" && m.image_url ? (
+                        <img
+                          src={m.image_url}
+                          alt=""
+                          className="factory-agent-strip-image"
+                        />
+                      ) : (
+                        m.content
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <p className="muted">No factory thread yet — first feedback will start it.</p>
+          )}
+        </div>
+      ) : (
+        <div className="factory-bind-form">
           <div className="factory-bind-manual">
             <input
               type="text"
-              placeholder="WO-1047"
+              placeholder="WO-1080"
               value={manualWo}
               onChange={(e) => setManualWo(e.target.value)}
               disabled={binding}
@@ -147,47 +350,9 @@ export function FactoryPanel({
               disabled={!manualWo.trim() || binding}
               onClick={() => void bind(manualWo.trim())}
             >
-              Bind
+              Bind WO
             </button>
           </div>
-        </div>
-      ) : (
-        <div className="factory-bound">
-          <button
-            type="button"
-            className="secondary factory-unbind-btn"
-            disabled={binding}
-            onClick={() => void bind(null)}
-          >
-            Unbind
-          </button>
-
-          {agentReplies.length > 0 ? (
-            <div className="factory-agent-strip">
-              <button
-                type="button"
-                className="factory-agent-strip-toggle"
-                onClick={() => setExpanded((v) => !v)}
-                aria-expanded={expanded}
-              >
-                {expanded ? "▾" : "▸"} Agent replies ({agentReplies.length})
-              </button>
-              {expanded ? (
-                <ul className="factory-agent-strip-list">
-                  {agentReplies.slice(-10).map((m, i) => (
-                    <li key={m.id ?? i}>
-                      <span className="factory-agent-strip-author">{m.author}:</span>{" "}
-                      {m.type === "image" && m.image_url ? (
-                        <img src={m.image_url} alt="" className="factory-agent-strip-image" />
-                      ) : (
-                        m.content
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       )}
     </div>

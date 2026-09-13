@@ -32,6 +32,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ sessionId: activeSessionId, tabId: activeTabId });
     return false;
   }
+  if (message.type === "oryntra_heartbeat") {
+    void extensionHeartbeat();
+    sendResponse({ ok: true });
+    return false;
+  }
   return false;
 });
 

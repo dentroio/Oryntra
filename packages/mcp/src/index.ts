@@ -255,22 +255,26 @@ server.registerTool(
     if (!moment) {
       return textResult({ error: `Pending moment not found: ${feedbackMomentId}` });
     }
-    const [session, browserState, transcript, artifacts] = await Promise.all([
-      client.getSession(id),
-      client.getBrowserState(id),
-      client.getTranscript(id),
-      client.listArtifacts(id),
-    ]);
+    const [session, browserState, transcript, artifacts, factoryContext] =
+      await Promise.all([
+        client.getSession(id),
+        client.getBrowserState(id),
+        client.getTranscript(id),
+        client.listArtifacts(id),
+        client.getFactoryContext(id),
+      ]);
     return textResult({
       session,
       feedbackMoment: moment,
       browserState,
       transcript,
       artifacts,
+      factoryContext,
       workspacePath: session.workspacePath,
       appUrl: session.appUrl,
-      instructions:
-        "Reply conversationally in Review Studio via submit_review_response. Include a change_request draft when the reviewer wants a change.",
+      instructions: factoryContext.factoryWo
+        ? `This session is bound to factory ${factoryContext.factoryWo} (implementer ${factoryContext.factoryAgent ?? "unclaimed"}; addressing ${factoryContext.factoryAddressedTo ?? factoryContext.factoryAgent ?? "the claiming agent"}). Continue that thread — do not start over. factoryContext.thread is the memory; factoryContext.participants is the roster. Reply via submit_review_response. To correct a specific agent, call address_factory_agent first.`
+        : "Scratch review (not bound to a factory agent). Idle factory runners can claim new work after export_artifact_to_factory. Reply conversationally via submit_review_response. Include a change_request draft when the reviewer wants a change.",
     });
   },
 );
@@ -286,13 +290,14 @@ server.registerTool(
   },
   async ({ sessionId }) => {
     const id = await resolveSessionId(sessionId);
-    const [session, pending, browserState, transcript, artifacts] =
+    const [session, pending, browserState, transcript, artifacts, factoryContext] =
       await Promise.all([
         client.getSession(id),
         client.getPendingFeedback(id),
         client.getBrowserState(id),
         client.getTranscript(id),
         client.listArtifacts(id),
+        client.getFactoryContext(id),
       ]);
     return textResult({
       session,
@@ -300,6 +305,7 @@ server.registerTool(
       browserState,
       transcript,
       artifacts,
+      factoryContext,
       workspacePath: session.workspacePath,
       appUrl: session.appUrl,
     });
@@ -542,6 +548,98 @@ server.registerTool(
       workspacePath: handoff.session.workspacePath,
       appUrl: handoff.session.appUrl,
     });
+  },
+);
+
+server.registerTool(
+  "list_factory_work",
+  {
+    description:
+      "List live factory agents and the WO each one is working on (claimed / in_progress / awaiting_human). Use this to pick which agent a review should talk to.",
+    inputSchema: {},
+  },
+  async () => {
+    const live = await client.listFactoryLiveWork();
+    return textResult({
+      live,
+      hint:
+        live.length === 0
+          ? "No live factory WOs. Use an unbound scratch review, then export_artifact_to_factory after approval."
+          : "Call bind_factory_session with the WO of the agent you want to continue talking to.",
+    });
+  },
+);
+
+server.registerTool(
+  "bind_factory_session",
+  {
+    description:
+      "Bind the current Oryntra session to a factory WO so feedback relays to that agent's thread (with existing memory). Pass wo=null to unbind for scratch review.",
+    inputSchema: {
+      sessionId: z.string().optional(),
+      wo: z
+        .string()
+        .nullable()
+        .describe("Factory WO id such as WO-1080, or null to unbind"),
+    },
+  },
+  async ({ sessionId, wo }) => {
+    const id = await resolveSessionId(sessionId);
+    const session = await client.bindFactoryWo(id, wo);
+    const factoryContext = await client.getFactoryContext(id);
+    return textResult({ session, factoryContext });
+  },
+);
+
+server.registerTool(
+  "join_factory_review",
+  {
+    description:
+      "Open or reuse the active Review Studio session bound to a factory WO (same as the factory status-site Open in Oryntra button).",
+    inputSchema: {
+      wo: z.string().describe("Factory WO id such as WO-1080"),
+    },
+  },
+  async ({ wo }) => {
+    const result = await client.joinFactoryReview(wo);
+    const factoryContext = await client.getFactoryContext(result.sessionId);
+    return textResult({ ...result, factoryContext });
+  },
+);
+
+server.registerTool(
+  "address_factory_agent",
+  {
+    description:
+      "Address subsequent review feedback to a specific factory participant on the bound WO (implementer or reviewer). Uses @agent: tagging on the thread.",
+    inputSchema: {
+      sessionId: z.string().optional(),
+      agent: z
+        .string()
+        .nullable()
+        .describe("Participant name such as cursor or security, or null to clear"),
+    },
+  },
+  async ({ sessionId, agent }) => {
+    const id = await resolveSessionId(sessionId);
+    const session = await client.setFactoryAddressedTo(id, agent);
+    return textResult({ session });
+  },
+);
+
+server.registerTool(
+  "export_artifact_to_factory",
+  {
+    description:
+      "Queue an approved change_request or work_order as a new factory WO. If the session is unbound, it binds to the created WO so the assigned agent inherits this review.",
+    inputSchema: {
+      sessionId: z.string().optional(),
+      artifactId: z.string(),
+    },
+  },
+  async ({ sessionId, artifactId }) => {
+    const id = await resolveSessionId(sessionId);
+    return textResult(await client.exportArtifactToFactory(id, artifactId));
   },
 );
 

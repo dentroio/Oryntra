@@ -1,5 +1,5 @@
 import type { FacilitatorResponse, ReviewArtifact } from "@oryntra/core";
-import { buildEffectiveTranscript } from "./chat-context.js";
+import { buildEffectiveTranscript, transcriptFromFeedback } from "./chat-context.js";
 import { buildConversationalReply } from "./feedback-analysis.js";
 import { StubReviewFacilitator } from "./stub.js";
 import type { ProcessFeedbackInput, ReviewFacilitator } from "./types.js";
@@ -8,11 +8,7 @@ export class InstantReviewFacilitator implements ReviewFacilitator {
   private readonly stub = new StubReviewFacilitator();
 
   async processFeedback(input: ProcessFeedbackInput): Promise<FacilitatorResponse> {
-    const context = buildEffectiveTranscript({
-      transcript: input.transcript,
-      chatHistory: input.chatHistory,
-      artifacts: input.artifacts,
-    });
+    const context = buildEffectiveTranscript(transcriptFromFeedback(input));
     const result = await this.stub.processFeedback(input);
     const artifact = result.suggestedArtifacts?.[0];
 

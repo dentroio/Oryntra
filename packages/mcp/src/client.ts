@@ -186,6 +186,110 @@ export class OryntraApiClient {
     return res.json() as Promise<import("@oryntra/core").PatchResult>;
   }
 
+  async getFactoryContext(sessionId: string): Promise<{
+    factoryWo: string | null;
+    factoryAgent: string | null;
+    factoryBackend: string | null;
+    factorySlug: string | null;
+    factoryAddressedTo: string | null;
+    participants: Array<{
+      name: string;
+      role: "implementer" | "reviewer" | "agent" | "human" | "system";
+    }>;
+    thread: Array<{
+      author: string;
+      role: string;
+      type: string;
+      content: string;
+      image_url?: string;
+    }>;
+  }> {
+    return this.get(`/api/sessions/${sessionId}/factory-context`);
+  }
+
+  async joinFactoryReview(wo: string): Promise<{
+    sessionId: string;
+    reviewRoomUrl: string;
+    wo: string;
+  }> {
+    const url = new URL("/api/factory/join", `${this.baseUrl}/`);
+    url.searchParams.set("wo", wo);
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Join factory review failed (${res.status})`);
+    }
+    return res.json() as Promise<{
+      sessionId: string;
+      reviewRoomUrl: string;
+      wo: string;
+    }>;
+  }
+
+  async setFactoryAddressedTo(
+    sessionId: string,
+    agent: string | null,
+  ): Promise<ReviewSession> {
+    const res = await fetch(`${this.baseUrl}/api/sessions/${sessionId}/factory-address`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agent }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Address factory agent failed (${res.status})`);
+    }
+    return res.json() as Promise<ReviewSession>;
+  }
+
+  async listFactoryLiveWork(): Promise<
+    Array<{
+      wo: string;
+      status: string;
+      agent: string;
+      backend: string;
+      slug: string;
+      step: string;
+      prUrl: string;
+      claimedAt: string | null;
+    }>
+  > {
+    return this.get("/api/factory/live-work");
+  }
+
+  async bindFactoryWo(sessionId: string, wo: string | null): Promise<ReviewSession> {
+    const res = await fetch(`${this.baseUrl}/api/sessions/${sessionId}/factory-wo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wo }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Bind factory WO failed (${res.status})`);
+    }
+    return res.json() as Promise<ReviewSession>;
+  }
+
+  async exportArtifactToFactory(
+    sessionId: string,
+    artifactId: string,
+  ): Promise<{ ok: boolean; woId?: string; error?: string; alreadyExported?: boolean }> {
+    const res = await fetch(
+      `${this.baseUrl}/api/sessions/${sessionId}/artifacts/${artifactId}/export-factory`,
+      { method: "POST" },
+    );
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Export to factory failed (${res.status})`);
+    }
+    return res.json() as Promise<{
+      ok: boolean;
+      woId?: string;
+      error?: string;
+      alreadyExported?: boolean;
+    }>;
+  }
+
   private async get<T>(path: string): Promise<T> {
     const res = await fetch(`${this.baseUrl}${path}`);
     if (!res.ok) {

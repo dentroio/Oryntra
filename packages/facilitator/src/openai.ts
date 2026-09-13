@@ -2,6 +2,7 @@ import { createId, type FacilitatorResponse, type ReviewArtifact } from "@oryntr
 import {
   buildEffectiveTranscript,
   formatChatHistoryForPrompt,
+  transcriptFromFeedback,
 } from "./chat-context.js";
 import { StubReviewFacilitator } from "./stub.js";
 import type { ReviewFacilitator } from "./types.js";
@@ -54,11 +55,7 @@ export class OpenAiReviewFacilitator implements ReviewFacilitator {
         input.moment.spatial.lockedElement ??
         input.moment.spatial.lastClickedElement ??
         input.moment.spatial.elementUnderPointer;
-      const context = buildEffectiveTranscript({
-        transcript: input.transcript,
-        chatHistory: input.chatHistory,
-        artifacts: input.artifacts,
-      });
+      const context = buildEffectiveTranscript(transcriptFromFeedback(input));
 
       const prompt = `You are Oryntra, an AI product review facilitator.
 Analyze reviewer feedback about a live web UI session.

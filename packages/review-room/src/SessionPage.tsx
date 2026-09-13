@@ -89,8 +89,9 @@ function shortRoute(route: string): string {
 
 export function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sidePanelLayout = searchParams.get("layout") === "sidepanel";
+  const woParam = searchParams.get("wo");
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [browserState, setBrowserState] = useState<BrowserState | null>(null);
   const [events, setEvents] = useState<BrowserEvent[]>([]);
@@ -257,6 +258,9 @@ export function SessionPage() {
     }
   }, [awaitingMomentId, feedbackMoments, chat]);
 
+  const usesIdeFacilitator = session?.facilitatorProvider === "ide";
+  const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
+
   useEffect(() => {
     if (!awaitingMomentId) return;
     const timeout = window.setTimeout(() => {
@@ -269,8 +273,6 @@ export function SessionPage() {
     return () => window.clearTimeout(timeout);
   }, [awaitingMomentId, ideLabel]);
 
-  const usesIdeFacilitator = session?.facilitatorProvider === "ide";
-  const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
   const waitingForIde =
     usesIdeFacilitator &&
     (submitting ||
@@ -306,6 +308,9 @@ export function SessionPage() {
   const apiBase = useMemo(() => "", []);
   const embedded = session?.captureMode === "embedded";
   const extensionMode = session?.captureMode === "extension";
+  // Clarion (or any live app) lives in another tab. Don't leave an empty
+  // black stage that crowds out chat in the Review Room window.
+  const hideAppStage = sidePanelLayout || extensionMode;
 
   useEffect(() => {
     activeThreadIdRef.current = activeThread?.id ?? null;
@@ -509,7 +514,18 @@ export function SessionPage() {
           );
           break;
         case "factory_binding":
-          setSession((prev) => (prev ? { ...prev, factoryWo: data.factoryWo } : prev));
+          setSession((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  factoryWo: data.factoryWo,
+                  factoryAgent: data.factoryAgent,
+                  factoryBackend: data.factoryBackend,
+                  factorySlug: data.factorySlug,
+                  factoryAddressedTo: data.factoryAddressedTo,
+                }
+              : prev,
+          );
           setFactoryRelayWarning(null);
           break;
         case "factory_relay_status":
@@ -558,6 +574,42 @@ export function SessionPage() {
 
     return () => ws.close();
   }, [apiBase, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !session || !woParam) return;
+    const bound = (session.factoryWo ?? "").replace(/^WO-/i, "");
+    const incoming = woParam.replace(/^WO-/i, "");
+    if (bound && bound === incoming) {
+      if (searchParams.has("wo")) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("wo");
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/sessions/${sessionId}/factory-wo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wo: woParam }),
+        });
+        if (!res.ok || cancelled) return;
+        const updated = (await res.json()) as ReviewSession;
+        if (cancelled) return;
+        setSession(updated);
+        const next = new URLSearchParams(searchParams);
+        next.delete("wo");
+        setSearchParams(next, { replace: true });
+      } catch {
+        // Join from a WO query is best-effort; the factory panel still works.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase, sessionId, session, woParam, searchParams, setSearchParams]);
 
   async function setMode(mode: ReviewMode) {
     if (!sessionId) return;
@@ -729,6 +781,7 @@ export function SessionPage() {
           reviewMode,
           screenshotId: stagedSnap?.screenshotId,
           accessibilitySnapshotId: stagedSnap?.accessibilitySnapshotId,
+          addressedTo: session?.factoryAddressedTo ?? session?.factoryAgent ?? null,
         }),
       });
       if (!res.ok) {
@@ -813,6 +866,7 @@ export function SessionPage() {
       {!sidePanelLayout ? (
       <header className="studio-header">
         <div className="studio-brand">
+          <img className="studio-mark" src="/oryntra.png" alt="" />
           <span className="studio-logo">Oryntra</span>
           <span className="studio-sub">Review Studio</span>
         </div>
@@ -828,6 +882,7 @@ export function SessionPage() {
       ) : (
         <header className="studio-header studio-header-compact">
           <div className="compact-status-row">
+            <img className="studio-mark studio-mark-compact" src="/oryntra.png" alt="" />
             <span className="compact-label">Page</span>
             <span className="status-pill" title={browserState?.route ?? session?.appUrl}>
               {shortRoute(browserState?.route ?? session?.appUrl ?? "/")}
@@ -923,16 +978,16 @@ export function SessionPage() {
       ) : null}
 
       <div
-        className={`studio-body${sidePanelLayout ? " sidepanel-layout" : ""}`}
+        className={`studio-body${hideAppStage ? " sidepanel-layout" : ""}`}
         style={
           {
-            "--chat-panel-width": sidePanelLayout
+            "--chat-panel-width": hideAppStage
               ? "100%"
               : `${chatPanelWidth}px`,
           } as CSSProperties
         }
       >
-        {!sidePanelLayout ? (
+        {!hideAppStage ? (
         <section className="studio-app">
           <div className="studio-app-label">
             {embedded
@@ -968,7 +1023,7 @@ export function SessionPage() {
         </section>
         ) : null}
 
-        {!sidePanelLayout ? (
+        {!hideAppStage ? (
         <div
           className={`studio-resizer${resizingChat ? " dragging" : ""}`}
           role="separator"
@@ -982,9 +1037,23 @@ export function SessionPage() {
             <FactoryPanel
               sessionId={sessionId ?? ""}
               factoryWo={session?.factoryWo}
+              factoryAgent={session?.factoryAgent}
+              factorySlug={session?.factorySlug}
+              factoryAddressedTo={session?.factoryAddressedTo}
               relayWarning={factoryRelayWarning}
-              onBindingChanged={(wo) =>
-                setSession((prev) => (prev ? { ...prev, factoryWo: wo } : prev))
+              onBindingChanged={(binding) =>
+                setSession((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        factoryWo: binding.factoryWo,
+                        factoryAgent: binding.factoryAgent,
+                        factoryBackend: binding.factoryBackend,
+                        factorySlug: binding.factorySlug,
+                        factoryAddressedTo: binding.factoryAddressedTo,
+                      }
+                    : prev,
+                )
               }
             />
             <div className="side-chat">

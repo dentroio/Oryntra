@@ -34,6 +34,9 @@ export function formatReviewHistoryMarkdown(input: {
     `**Active session:** ${input.session.id}`,
     `**Review Room:** ${input.reviewRoomUrl}`,
     `**Updated:** ${new Date().toISOString()}`,
+    input.session.factoryWo
+      ? `**Factory:** ${input.session.factoryWo}${input.session.factoryAgent ? ` · agent ${input.session.factoryAgent}` : ""}`
+      : "**Factory:** unbound (scratch review)",
     "",
     input.workspaceScoped
       ? "> Full review history for this workspace (all sessions). Open in Cursor anytime."

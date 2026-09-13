@@ -1,5 +1,5 @@
 import type { FacilitatorResponse } from "@oryntra/core";
-import { buildEffectiveTranscript } from "./chat-context.js";
+import { buildEffectiveTranscript, transcriptFromFeedback } from "./chat-context.js";
 import {
   artifactsFromCursorPayload,
   parseCursorReviewResponse,
@@ -32,11 +32,7 @@ export class CursorReviewFacilitator implements ReviewFacilitator {
   async processFeedback(
     input: ProcessFeedbackInput,
   ): Promise<FacilitatorResponse> {
-    const context = buildEffectiveTranscript({
-      transcript: input.transcript,
-      chatHistory: input.chatHistory,
-      artifacts: input.artifacts,
-    });
+    const context = buildEffectiveTranscript(transcriptFromFeedback(input));
 
     if (!input.cursorChatId) {
       return this.fallback(

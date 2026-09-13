@@ -50,6 +50,32 @@ export function ArtifactsPanel({
     }
   }
 
+  async function sendToFactory(artifact: ReviewArtifact) {
+    setBusyId(artifact.id);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/artifacts/${artifact.id}/export-factory`,
+        { method: "POST" },
+      );
+      const body = (await res.json()) as {
+        ok?: boolean;
+        woId?: string;
+        error?: string;
+        alreadyExported?: boolean;
+        artifact?: ReviewArtifact;
+      };
+      if (!res.ok || body.ok === false) {
+        throw new Error(body.error ?? "Send to Factory failed");
+      }
+      if (body.artifact) onArtifactUpdated(body.artifact);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Send to Factory failed");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (artifacts.length === 0) {
     return (
       <p className="muted">
@@ -115,6 +141,23 @@ export function ArtifactsPanel({
               >
                 Reject
               </button>
+            </div>
+          ) : null}
+          {(artifact.kind === "change_request" || artifact.kind === "work_order") &&
+          (artifact.status === "approved" || artifact.status === "implemented") ? (
+            <div className="artifact-buttons">
+              {artifact.factoryWoId ? (
+                <span className="muted">Factory {artifact.factoryWoId}</span>
+              ) : (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={busyId === artifact.id}
+                  onClick={() => void sendToFactory(artifact)}
+                >
+                  Send to Factory
+                </button>
+              )}
             </div>
           ) : null}
         </div>
