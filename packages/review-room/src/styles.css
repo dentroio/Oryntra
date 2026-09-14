@@ -57,6 +57,32 @@ body {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.ide-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ide-chip {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #1c2230;
+  color: #a8b3c7;
+  border: 1px solid #2a3344;
+  cursor: pointer;
+}
+
+.ide-chip.connected {
+  color: #7ee787;
+}
+
+.ide-chip.selected {
+  border-color: #58a6ff;
+  color: #fff;
 }
 
 .status-pill {

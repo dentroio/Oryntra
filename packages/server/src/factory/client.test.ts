@@ -9,6 +9,7 @@ import {
   listLiveWork,
   listValidationQueue,
   postThreadMessage,
+  probeFactoryReachable,
   resetFactoryAuthCache,
   submitFactoryValidation,
 } from "./client.js";
@@ -287,4 +288,15 @@ test("factoryThreadAsContext maps human/agent roles and keeps author labels", ()
   assert.match(ctx[0]?.content ?? "", /drawer is wrong/);
   assert.equal(ctx[1]?.role, "agent");
   assert.match(ctx[1]?.content ?? "", /cursor/);
+});
+
+test("probeFactoryReachable is true only when dispatch returns ok", async () => {
+  mockFetch(() => Response.json({}));
+  assert.equal(await probeFactoryReachable(), true);
+  mockFetch(() => new Response("down", { status: 502 }));
+  assert.equal(await probeFactoryReachable(), false);
+  mockFetch(() => {
+    throw new TypeError("fetch failed");
+  });
+  assert.equal(await probeFactoryReachable(), false);
 });

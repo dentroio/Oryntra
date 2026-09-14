@@ -8,6 +8,7 @@ import type {
   IdeRegistrationSource,
 } from "@oryntra/core";
 import { IDE_LABELS } from "@oryntra/core";
+import { probeFactoryReachable } from "./factory/client.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,8 +16,15 @@ const HEARTBEAT_TTL_MS = 90_000;
 
 type RegistryEntry = IdeRegistration & { expiresAt: number };
 
+export type IdeRegistryOptions = {
+  probeFactory?: () => Promise<boolean>;
+};
+
 export class IdeRegistry {
   private readonly entries = new Map<string, RegistryEntry>();
+  private factoryConnected = false;
+
+  constructor(private readonly options: IdeRegistryOptions = {}) {}
 
   heartbeat(request: IdeHeartbeatRequest): IdeRegistration {
     const provider = request.provider ?? "other";
@@ -56,9 +64,16 @@ export class IdeRegistry {
   }
 
   isConnected(workspacePath: string, provider: IdeProvider): boolean {
+    if (provider === "factory") return this.factoryConnected;
     return this.listConnected(workspacePath).some(
       (entry) => entry.provider === provider && entry.connected,
     );
+  }
+
+  async refreshFactoryConnected(): Promise<boolean> {
+    const probe = this.options.probeFactory ?? probeFactoryReachable;
+    this.factoryConnected = await probe();
+    return this.factoryConnected;
   }
 
   findConnected(
@@ -112,15 +127,32 @@ export class IdeRegistry {
 
   async listAvailable(workspacePath?: string): Promise<IdeRegistration[]> {
     const connected = this.listConnected(workspacePath);
-    const probed = await this.probeInstalled();
+    const probeFactory = this.options.probeFactory ?? probeFactoryReachable;
+    const [probed, factoryOk] = await Promise.all([
+      this.probeInstalled(),
+      probeFactory(),
+    ]);
+    this.factoryConnected = factoryOk;
     const merged = new Map<string, IdeRegistration>();
 
     for (const entry of [...connected, ...probed]) {
+      if (entry.provider === "factory") continue;
       const key = `${entry.provider}:${entry.clientId}`;
       const existing = merged.get(key);
       if (!existing || entry.connected) {
         merged.set(key, entry);
       }
+    }
+
+    if (factoryOk) {
+      merged.set("factory:probe:factory", {
+        provider: "factory",
+        clientId: "probe:factory",
+        label: IDE_LABELS.factory,
+        connected: true,
+        lastHeartbeat: new Date().toISOString(),
+        source: "factory",
+      });
     }
 
     return [...merged.values()].sort((a, b) => {

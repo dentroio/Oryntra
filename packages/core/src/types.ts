@@ -16,9 +16,15 @@ export type IdeProvider =
   | "jetbrains"
   | "zed"
   | "antigravity"
+  | "factory"
   | "other";
 
-export type IdeRegistrationSource = "mcp" | "extension" | "cli" | "probe";
+export type IdeRegistrationSource =
+  | "mcp"
+  | "extension"
+  | "cli"
+  | "probe"
+  | "factory";
 
 export type IdeRegistration = {
   provider: IdeProvider;

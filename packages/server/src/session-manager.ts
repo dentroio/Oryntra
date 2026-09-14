@@ -11,6 +11,7 @@ import {
   createId,
   getScreenshotPath,
   loadOryntraConfig,
+  parseIdeProvider,
   type AgentThread,
   type BrowserEvent,
   type ChatMessage,
@@ -38,7 +39,6 @@ import {
   type ProposedPatch,
   type PatchResult,
   getIdeLabel,
-  parseIdeProvider,
 } from "@oryntra/core";
 import {
   createFacilitator,
@@ -266,9 +266,13 @@ export class SessionManager {
     sessionId: string,
     preferredIde: IdeProvider,
   ): Promise<ReviewSession> {
+    const parsed = parseIdeProvider(preferredIde);
+    if (!parsed) {
+      throw new Error(`Unknown IDE provider: ${preferredIde}`);
+    }
     const runtime = await this.ensureRuntime(sessionId);
-    runtime.session.preferredIde = preferredIde;
-    runtime.session.ide = preferredIde;
+    runtime.session.preferredIde = parsed;
+    runtime.session.ide = parsed;
     runtime.session.updatedAt = new Date().toISOString();
     this.store.saveSession(runtime.session);
     return runtime.session;
@@ -281,14 +285,18 @@ export class SessionManager {
   }> {
     const runtime = await this.ensureRuntime(sessionId);
     const preferredIde = resolveTargetIde(runtime.session, runtime.config);
+    const connected =
+      preferredIde === "factory"
+        ? Boolean(await this.ideRegistry?.refreshFactoryConnected())
+        : isTargetConnected(
+            this.ideRegistry,
+            runtime.session.workspacePath,
+            preferredIde,
+          );
     return {
       preferredIde,
       label: getIdeLabel(preferredIde),
-      connected: isTargetConnected(
-        this.ideRegistry,
-        runtime.session.workspacePath,
-        preferredIde,
-      ),
+      connected,
     };
   }
 
@@ -975,7 +983,13 @@ export class SessionManager {
     approveOptions?: { cursorAgent?: "continue" | "new" },
   ): Promise<{ started: boolean; reason?: string } | undefined> {
     const session = this.getSession(sessionId);
-    if (!shouldAutoImplementOnApprove(config, session?.captureMode)) {
+    if (
+      !shouldAutoImplementOnApprove(
+        config,
+        session?.captureMode,
+        session ? resolveTargetIde(session, config) : null,
+      )
+    ) {
       return undefined;
     }
 
@@ -1783,6 +1797,11 @@ export class SessionManager {
     const session = handoff.session;
     const config = runtime.config;
     const targetIde = resolveTargetIde(session, config);
+    if (targetIde === "factory") {
+      throw new Error(
+        "This session targets Factory. Use Send to Factory instead of local implement.",
+      );
+    }
     const targetConnected = isTargetConnected(
       this.ideRegistry,
       session.workspacePath,
