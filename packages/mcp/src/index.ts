@@ -273,8 +273,8 @@ server.registerTool(
       workspacePath: session.workspacePath,
       appUrl: session.appUrl,
       instructions: factoryContext.factoryWo
-        ? `This session is bound to factory ${factoryContext.factoryWo} (implementer ${factoryContext.factoryAgent ?? "unclaimed"}; addressing ${factoryContext.factoryAddressedTo ?? factoryContext.factoryAgent ?? "the claiming agent"}). Continue that thread — do not start over. factoryContext.thread is the memory; factoryContext.participants is the roster. Reply via submit_review_response. To correct a specific agent, call address_factory_agent first.`
-        : "Scratch review (not bound to a factory agent). Idle factory runners can claim new work after export_artifact_to_factory. Reply conversationally via submit_review_response. Include a change_request draft when the reviewer wants a change.",
+        ? `You are Oryntra's review facilitator, not the factory implementer. This session is bound to ${factoryContext.factoryWo} (implementer ${factoryContext.factoryAgent ?? "unclaimed"}). factoryContext.thread is memory only — do not speak as that agent. Reply via submit_review_response. The human posts a factory note from Review Studio to steer the implementer without interrupting their current pass.`
+        : "Scratch review (not bound to a factory WO). Idle factory runners can claim new work after export_artifact_to_factory. Reply conversationally via submit_review_response. Include a change_request draft when the reviewer wants a change.",
     });
   },
 );
@@ -565,8 +565,51 @@ server.registerTool(
       hint:
         live.length === 0
           ? "No live factory WOs. Use an unbound scratch review, then export_artifact_to_factory after approval."
-          : "Call bind_factory_session with the WO of the agent you want to continue talking to.",
+          : "Call bind_factory_session to load that WO as review memory. Review Send still talks to Oryntra; a factory note steers the implementer without interrupting.",
     });
+  },
+);
+
+server.registerTool(
+  "list_factory_validations",
+  {
+    description:
+      "List factory WOs awaiting a human verdict (awaiting_human). Bind one, inspect in Review Studio, then approve_factory_validation or reject with a note.",
+    inputSchema: {},
+  },
+  async () => {
+    const queue = await client.listFactoryValidations();
+    return textResult({
+      ...queue,
+      hint: !queue.factoryOk
+        ? "Factory is unreachable. Review Studio still works unbound."
+        : queue.items.length === 0
+          ? "No WOs awaiting human review."
+          : "Bind the WO, inspect the app, Post note for evidence, then submit the verdict.",
+    });
+  },
+);
+
+server.registerTool(
+  "submit_factory_validation",
+  {
+    description:
+      "Approve or reject a factory WO that is awaiting_human. Reject requires notes (posted to the WO thread).",
+    inputSchema: {
+      sessionId: z.string().optional(),
+      wo: z.string().describe("Factory WO id such as WO-1080"),
+      verdict: z.enum(["approve", "reject"]),
+      notes: z
+        .string()
+        .optional()
+        .describe("Required when rejecting. Optional on approve."),
+    },
+  },
+  async ({ sessionId, wo, verdict, notes }) => {
+    const id = await resolveSessionId(sessionId);
+    return textResult(
+      await client.submitFactoryValidation(id, wo, verdict, notes),
+    );
   },
 );
 
@@ -574,7 +617,7 @@ server.registerTool(
   "bind_factory_session",
   {
     description:
-      "Bind the current Oryntra session to a factory WO so feedback relays to that agent's thread (with existing memory). Pass wo=null to unbind for scratch review.",
+      "Bind the current Oryntra session to a factory WO so the review agent can use that thread as memory. Review Send does not post to the WO. Steer the implementer with a factory note from Review Studio. Pass wo=null to unbind.",
     inputSchema: {
       sessionId: z.string().optional(),
       wo: z
@@ -611,7 +654,7 @@ server.registerTool(
   "address_factory_agent",
   {
     description:
-      "Address subsequent review feedback to a specific factory participant on the bound WO (implementer or reviewer). Uses @agent: tagging on the thread.",
+      "Choose who a factory note is addressed to (@agent on the WO thread). Does not change who the review agent is, and does not post a note by itself.",
     inputSchema: {
       sessionId: z.string().optional(),
       agent: z
@@ -653,7 +696,7 @@ async function sendIdeHeartbeat(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       provider: resolveIdeProvider(),
-      clientId: process.env.ORYNTRA_MCP_CLIENT_ID ?? "mcp-stdio",
+      clientId: process.env.ORYNTRA_MCP_CLIENT_ID ?? `mcp:${resolveIdeProvider()}`,
       workspacePath: process.env.ORYNTRA_WORKSPACE,
       source: "mcp",
     }),

@@ -1,9 +1,11 @@
 /**
- * Factory API client — talks to the agentic-factory status site, which proxies
- * auth to the orchestrator so Oryntra needs no factory credentials of its own.
- * See docs/ORYNTRA_FACTORY_INTEGRATION.md (agentic-factory repo) / WO-1047.
+ * Factory API client — talks to the agentic-factory status site.
+ * Reads are unauthenticated. Writes send Bearer API_SECRET (ORYNTRA_FACTORY_SECRET,
+ * API_SECRET, or the dentroio-factory Keychain item).
+ * See docs/FACTORY.md (this repo) and docs/ORYNTRA_FACTORY_INTEGRATION.md (agentic-factory repo) / WO-1047.
  */
 
+import { execFileSync } from "node:child_process";
 import { formatAddressedFeedback } from "./participants.js";
 
 const DEFAULT_FACTORY_URL = "http://localhost:8099";
@@ -101,6 +103,68 @@ function factoryUrl(override?: string | null): string {
   return override || process.env.ORYNTRA_FACTORY_URL || DEFAULT_FACTORY_URL;
 }
 
+let cachedFactorySecret: string | undefined;
+
+/** Test hook — do not use in production code. */
+export function resetFactoryAuthCache(): void {
+  cachedFactorySecret = undefined;
+}
+
+function factoryApiSecret(): string {
+  if (cachedFactorySecret !== undefined) return cachedFactorySecret;
+  const fromEnv =
+    process.env.ORYNTRA_FACTORY_SECRET?.trim() ||
+    process.env.API_SECRET?.trim() ||
+    "";
+  if (fromEnv) {
+    cachedFactorySecret = fromEnv;
+    return cachedFactorySecret;
+  }
+  if (process.platform === "darwin") {
+    try {
+      cachedFactorySecret = execFileSync(
+        "security",
+        [
+          "find-generic-password",
+          "-s",
+          "dentroio-factory",
+          "-a",
+          "API_SECRET",
+          "-w",
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      ).trim();
+      return cachedFactorySecret;
+    } catch {
+      cachedFactorySecret = "";
+    }
+  } else {
+    cachedFactorySecret = "";
+  }
+  return cachedFactorySecret;
+}
+
+function factoryWriteHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const secret = factoryApiSecret();
+  if (secret) headers.Authorization = `Bearer ${secret}`;
+  return headers;
+}
+
+function factoryErrorMessage(
+  res: Response,
+  body: { detail?: string; error?: string },
+): string {
+  if (res.status === 401) {
+    return (
+      body.detail ||
+      body.error ||
+      "Factory write unauthorized — set ORYNTRA_FACTORY_SECRET to the factory API_SECRET"
+    );
+  }
+  return body.detail ?? body.error ?? `factory responded ${res.status}`;
+}
+
 const ACTIVE_STATUSES: ReadonlySet<FactoryDispatchStatus> = new Set([
   "claimed",
   "in_progress",
@@ -179,6 +243,82 @@ export async function listLiveWork(
   }
 }
 
+export type FactoryValidationQueue = {
+  factoryOk: boolean;
+  items: FactoryLiveWork[];
+};
+
+/** WOs waiting on a human verdict (`awaiting_human`). Distinguishes factory-offline. */
+export async function listValidationQueue(
+  factoryUrlOverride?: string | null,
+): Promise<FactoryValidationQueue> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/dispatch`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return { factoryOk: false, items: [] };
+    const dispatch = (await res.json()) as FactoryDispatchMap;
+    const items = Object.entries(dispatch)
+      .filter(([, entry]) => entry.status === "awaiting_human")
+      .map(([wo, entry]) => liveWorkFromEntry(wo, entry))
+      .sort((a, b) => (b.claimedAt ?? "").localeCompare(a.claimedAt ?? ""));
+    return { factoryOk: true, items };
+  } catch {
+    return { factoryOk: false, items: [] };
+  }
+}
+
+export type FactoryValidationVerdict = "approve" | "reject";
+
+export type FactoryValidationResult = {
+  ok: boolean;
+  error?: string;
+};
+
+/**
+ * Approve or reject a factory WO. Never throws — Studio must stay usable if
+ * the factory is down. Reject notes are stored by the orchestrator and posted
+ * to the WO thread.
+ */
+export async function submitFactoryValidation(
+  wo: string,
+  verdict: FactoryValidationVerdict,
+  input: { decidedBy: string; notes?: string },
+  factoryUrlOverride?: string | null,
+): Promise<FactoryValidationResult> {
+  try {
+    const path = verdict === "reject" ? "reject" : "approve";
+    const res = await fetch(
+      `${factoryUrl(factoryUrlOverride)}/api/validations/${encodeURIComponent(wo)}/${path}`,
+      {
+        method: "POST",
+        headers: factoryWriteHeaders(),
+        body: JSON.stringify({
+          decided_by: input.decidedBy,
+          notes: input.notes ?? "",
+        }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as {
+        detail?: string;
+        error?: string;
+      };
+      return {
+        ok: false,
+        error: factoryErrorMessage(res, body),
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "validation failed",
+    };
+  }
+}
+
 export async function getDispatchEntry(
   wo: string,
   factoryUrlOverride?: string | null,
@@ -236,7 +376,7 @@ export async function createFactoryWo(
   try {
     const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/wos`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: factoryWriteHeaders(),
       body: JSON.stringify({
         title: input.title,
         priority: input.priority ?? "P2",
@@ -252,15 +392,19 @@ export async function createFactoryWo(
       wo_number?: number | string;
       url?: string;
       error?: string;
+      detail?: string;
     };
     if (!res.ok) {
-      return { ok: false, error: body.error ?? `factory responded ${res.status}` };
+      return { ok: false, error: factoryErrorMessage(res, body) };
     }
     const number = body.wo_number;
     const woId =
       typeof number === "number" || typeof number === "string"
         ? `WO-${number}`
         : undefined;
+    if (!woId) {
+      return { ok: false, error: "Factory did not return a WO number" };
+    }
     return { ok: true, woId, url: body.url };
   } catch (error) {
     return {
@@ -307,7 +451,7 @@ export async function postThreadMessage(
   try {
     const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/proxy/thread/${encodeURIComponent(wo)}/messages`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: factoryWriteHeaders(),
       body: JSON.stringify({
         author: input.author,
         role: "human",

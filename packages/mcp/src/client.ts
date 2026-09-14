@@ -257,6 +257,43 @@ export class OryntraApiClient {
     return this.get("/api/factory/live-work");
   }
 
+  async listFactoryValidations(): Promise<{
+    factoryOk: boolean;
+    items: Array<{
+      wo: string;
+      status: string;
+      agent: string;
+      backend: string;
+      slug: string;
+      step: string;
+      prUrl: string;
+      claimedAt: string | null;
+    }>;
+  }> {
+    return this.get("/api/factory/validations");
+  }
+
+  async submitFactoryValidation(
+    sessionId: string,
+    wo: string,
+    verdict: "approve" | "reject",
+    notes?: string,
+  ): Promise<{ ok: boolean; wo: string; verdict: string }> {
+    const res = await fetch(
+      `${this.baseUrl}/api/sessions/${sessionId}/factory-validations/${encodeURIComponent(wo)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verdict, notes }),
+      },
+    );
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(body.error ?? `Factory validation failed (${res.status})`);
+    }
+    return res.json() as Promise<{ ok: boolean; wo: string; verdict: string }>;
+  }
+
   async bindFactoryWo(sessionId: string, wo: string | null): Promise<ReviewSession> {
     const res = await fetch(`${this.baseUrl}/api/sessions/${sessionId}/factory-wo`, {
       method: "POST",

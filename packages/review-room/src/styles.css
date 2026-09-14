@@ -183,6 +183,19 @@ body {
   justify-content: flex-end;
 }
 
+.chat-channel-label {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8b9bb4;
+  margin-bottom: 4px;
+}
+
+.chat-turn-note .msg {
+  border-color: #35588a;
+}
+
 .mic-btn.listening {
   border-color: #b54708;
   color: #e8c27a;
@@ -1045,6 +1058,17 @@ code {
   line-height: 1.35;
 }
 
+.factory-progress {
+  color: #c9d1d9;
+  font-size: 0.78rem;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+.factory-progress a {
+  color: #58a6ff;
+}
+
 .factory-live-list {
   display: flex;
   flex-direction: column;
@@ -1116,6 +1140,40 @@ code {
 
 .factory-unbind-btn {
   font-size: 0.75rem;
+}
+
+.factory-offline {
+  color: #ffcf7d;
+  font-size: 0.8rem;
+  margin: 6px 0 0;
+}
+
+.factory-live-item-bound {
+  border-color: #58a6ff;
+}
+
+.factory-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.factory-verdict textarea {
+  width: 100%;
+  resize: vertical;
+  background: #0e131b;
+  border: 1px solid #2a3344;
+  border-radius: 6px;
+  color: #e8eaed;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+
+.factory-verdict-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .factory-roster {

@@ -15,14 +15,17 @@ App in normal browser tab (extension captures spatial context)
         +
 Review Studio in Chrome side panel (chat, artifacts, approve)
         ↓
-Oryntra backend (localhost:4317)
+Oryntra backend — local daemon on localhost:4317 (not a shared Docker stack)
         ↓
 IDE Registry detects connected IDEs (Cursor MCP, VS Code, …)
         ↓
 MCP handoff → preferred IDE implements in your workspace
+        ↘ (optional) HTTP → agentic-factory on :8099 (WOs / runners)
 ```
 
 **Single screen.** No iframe. No second Chromium window.
+
+**Runtime:** Oryntra is a **localhost service** on your machine (Node daemon / `npm run dev`). The agentic factory is a **separate** process Oryntra calls over HTTP — they are not one container. See [Factory integration](./docs/FACTORY.md).
 
 ## Documentation
 
@@ -30,6 +33,7 @@ MCP handoff → preferred IDE implements in your workspace
 |----------|-------------|
 | [Architecture & Design Spec (v1.2)](./docs/ARCHITECTURE.md) | Full product architecture, capture modes, multi-IDE registry |
 | [Browser Extension](./docs/BROWSER_EXTENSION.md) | Enterprise single-screen review (recommended) |
+| [Factory + runtime](./docs/FACTORY.md) | Local daemon model; Oryntra ↔ agentic-factory workflow |
 | [MVP Build Guide](./docs/MVP_BUILD.md) | Implementation brief for Phase 1–3 |
 | [Cursor Review Loop](./docs/CURSOR_REVIEW.md) | IDE agent as facilitator |
 | [MCP Setup (Cursor)](./docs/MCP_SETUP.md) | Connect IDE agent to review sessions |

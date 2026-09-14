@@ -20,46 +20,40 @@
       }
       header {
         flex-shrink: 0;
-        padding: 10px 12px 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
         border-bottom: 1px solid #30363d;
         background: #161b22;
       }
-      header h1 {
-        margin: 0;
-        font-size: 14px;
-        font-weight: 600;
-      }
-      .meta { font-size: 11px; color: #8b949e; margin-top: 6px; }
-      .ide-bar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 8px;
-      }
-      .ide-chip {
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid #30363d;
-        background: #21262d;
-        color: inherit;
-      }
-      .ide-chip.selected {
-        border-color: #58a6ff;
-        box-shadow: 0 0 0 1px #58a6ff;
-      }
-      .ide-chip.connected {
-        border-color: #238636;
-        color: #7ee787;
-      }
-      .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        padding: 8px 12px;
-        border-bottom: 1px solid #30363d;
+      .mark {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        object-fit: contain;
         flex-shrink: 0;
       }
+      .identity {
+        flex: 1;
+        min-width: 0;
+      }
+      .meta {
+        font-size: 12px;
+        font-weight: 600;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ide-status {
+        font-size: 11px;
+        color: #8b949e;
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ide-status.ok { color: #7ee787; }
       button {
         cursor: pointer;
         border: 1px solid #30363d;
@@ -81,68 +75,83 @@
         border-color: #58a6ff;
         color: #9cc4ff;
       }
+      #start-btn { flex-shrink: 0; }
       .status {
         padding: 6px 12px;
         font-size: 12px;
         color: #8b949e;
         flex-shrink: 0;
+        border-bottom: 1px solid #30363d;
       }
       .status.error { color: #f85149; }
-      .route-row {
+      .bound-bar {
         display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
-        padding: 0 12px 8px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 12px;
+        font-size: 12px;
+        background: #12151c;
+        border-bottom: 1px solid #30363d;
         flex-shrink: 0;
       }
-      .pill {
-        font-size: 11px;
-        padding: 3px 8px;
-        border-radius: 999px;
-        background: #1c2230;
-        color: #a8b3c7;
-        border: 1px solid #2a3344;
-        max-width: 100%;
+      .bound-meta {
+        min-width: 0;
+        flex: 1;
+      }
+      .bound-bar #factory-label {
+        display: block;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .pill.accent {
-        background: #1a2740;
-        color: #9cc4ff;
-        border-color: #35588a;
+      .bound-bar #factory-detail {
+        display: block;
+        margin-top: 2px;
+        font-size: 11px;
+        color: #8b949e;
+        line-height: 1.35;
       }
-      .modes {
+      .bound-bar #factory-pr {
+        display: inline-block;
+        margin-top: 4px;
+        font-size: 11px;
+        color: #58a6ff;
+        text-decoration: none;
+      }
+      .bound-bar #factory-pr[hidden] { display: none; }
+      .bound-actions {
         display: flex;
         gap: 4px;
-        padding: 0 12px 8px;
         flex-shrink: 0;
       }
-      .modes button { padding: 4px 8px; font-size: 11px; }
+      .bound-bar button { padding: 3px 8px; font-size: 11px; }
       .banner {
-        margin: 0 12px 8px;
+        margin: 8px 12px 0;
         padding: 8px 10px;
         border-radius: 6px;
         background: #1a2740;
         border: 1px solid #35588a;
         font-size: 12px;
         display: none;
+        flex-shrink: 0;
       }
       .banner.show { display: block; }
       .chat-stream {
         flex: 1;
         min-height: 0;
         overflow-y: auto;
-        padding: 8px 12px 12px;
+        padding: 16px 12px 12px;
         display: flex;
         flex-direction: column;
         gap: 10px;
       }
       .hint {
         color: #8b949e;
-        font-size: 12px;
+        font-size: 13px;
         line-height: 1.45;
-        margin: 8px 0;
+        margin: auto 0;
+        text-align: center;
       }
       .msg {
         max-width: 100%;
@@ -179,11 +188,74 @@
         gap: 6px;
         margin-top: 8px;
       }
+      .route-row {
+        display: flex;
+        gap: 6px;
+        padding: 0 12px 8px;
+        flex-shrink: 0;
+        min-width: 0;
+      }
+      .pill {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        background: #1c2230;
+        color: #a8b3c7;
+        border: 1px solid #2a3344;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      .pill.accent {
+        flex: 1;
+        background: #1a2740;
+        color: #9cc4ff;
+        border-color: #35588a;
+      }
       .composer {
         flex-shrink: 0;
         border-top: 1px solid #30363d;
         padding: 8px 12px 10px;
         background: #161b22;
+      }
+      .composer-lane {
+        display: none;
+        font-size: 11px;
+        color: #8b949e;
+        margin-bottom: 6px;
+        line-height: 1.4;
+      }
+      .composer-lane.show { display: block; }
+      .address-chips {
+        display: none;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+      .address-chips.show { display: flex; }
+      .address-chip {
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #30363d;
+        background: #21262d;
+        color: inherit;
+      }
+      .address-chip.active {
+        border-color: #58a6ff;
+        color: #9cc4ff;
+      }
+      .msg-channel {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #8b9bb4;
+        margin-bottom: 4px;
+      }
+      .msg-note {
+        border-color: #35588a;
       }
       .composer textarea {
         width: 100%;
@@ -200,7 +272,9 @@
         display: flex;
         gap: 6px;
         margin-top: 6px;
+        align-items: center;
       }
+      .composer-actions .spacer { flex: 1; }
       .snap-preview {
         display: none;
         margin-bottom: 6px;
@@ -216,61 +290,49 @@
         margin-top: 4px;
         border: 1px solid #30363d;
       }
-      .factory-strip {
-        flex-shrink: 0;
-        padding: 8px 12px;
-        border-bottom: 1px solid #30363d;
-        background: #12151c;
-      }
-      .factory-line {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        font-size: 12px;
-        color: #c9d1d9;
-      }
-      .factory-bind {
-        display: flex;
-        gap: 6px;
-        margin-top: 6px;
-      }
-      .factory-bind input {
-        flex: 1;
-        min-width: 0;
-        background: #0e131b;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        color: #e6edf3;
-        padding: 6px 8px;
-        font-size: 12px;
-      }
-      .factory-live {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 6px;
-      }
-      .factory-live button {
-        font-size: 11px;
-        padding: 3px 8px;
-      }
       details.more {
         flex-shrink: 0;
-        padding: 4px 12px 10px;
+        padding: 6px 12px 10px;
         border-top: 1px solid #30363d;
         font-size: 12px;
         color: #8b949e;
       }
-      details.more summary { cursor: pointer; }
-      .field {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-top: 8px;
+      details.more summary {
+        cursor: pointer;
+        color: #8b949e;
       }
-      .field label { font-size: 11px; color: #8b949e; }
-      .field input {
+      .more-block { margin-top: 10px; }
+      .more-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 6px;
+      }
+      .ide-bar, .modes, .factory-live, .more-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .ide-chip {
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid #30363d;
+        background: #21262d;
+        color: inherit;
+      }
+      .ide-chip.selected {
+        border-color: #58a6ff;
+        box-shadow: 0 0 0 1px #58a6ff;
+      }
+      .ide-chip.connected { color: #7ee787; }
+      .factory-bind {
+        display: flex;
+        gap: 6px;
+      }
+      .factory-bind input, .field input {
+        flex: 1;
+        min-width: 0;
         width: 100%;
         background: #0e131b;
         border: 1px solid #30363d;
@@ -279,71 +341,90 @@
         padding: 6px 8px;
         font-size: 12px;
       }
+      .field { margin-top: 10px; }
+      .field label {
+        display: block;
+        font-size: 11px;
+        margin-bottom: 4px;
+      }
     </style>
   </head>
   <body>
     <header>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <img src="oryntra.png" alt="" style="width: 22px; height: 22px; border-radius: 6px; object-fit: contain;" />
-        <h1>Oryntra Review</h1>
+      <img class="mark" src="oryntra.png" alt="" />
+      <div class="identity">
+        <div class="meta" id="session-meta">Clarion</div>
+        <div class="ide-status" id="ide-status">Start a review</div>
       </div>
-      <div class="meta" id="session-meta">Stay on Clarion, then Start review</div>
-      <div class="ide-bar" id="ide-bar"></div>
+      <button class="primary" id="start-btn">Start</button>
     </header>
-    <div class="toolbar">
-      <button class="primary" id="start-btn">Start review</button>
-      <button type="button" id="refresh-btn">Refresh IDEs</button>
-      <button type="button" id="options-btn">Settings</button>
-      <button type="button" id="open-studio-btn" title="Optional — factory panel and full history">Full studio</button>
+    <div class="status" id="status" hidden></div>
+    <div class="bound-bar" id="bound-bar" hidden>
+      <span class="bound-meta">
+        <span id="factory-label"></span>
+        <span id="factory-detail"></span>
+        <a id="factory-pr" hidden target="_blank" rel="noopener">PR</a>
+      </span>
+      <span class="bound-actions">
+        <button type="button" id="factory-approve-btn" hidden>Approve WO</button>
+        <button type="button" id="factory-reject-btn" hidden>Reject</button>
+        <button type="button" id="factory-unbind-btn">Unbind</button>
+      </span>
     </div>
-    <div class="status" id="status">Chat stays in this panel. Clarion stays in the tab.</div>
-    <div class="factory-strip" id="factory-strip" hidden>
-      <div class="factory-line">
-        <span id="factory-label">Scratch review</span>
-        <button type="button" id="factory-unbind-btn" hidden>Unbind</button>
-      </div>
-      <div class="factory-bind" id="factory-bind">
-        <input id="factory-wo" placeholder="WO-1080" spellcheck="false" />
-        <button type="button" id="factory-bind-btn">Bind WO</button>
-      </div>
-      <div class="factory-live" id="factory-live"></div>
+    <div class="banner" id="implement-banner"></div>
+    <div class="chat-stream" id="chat-stream">
+      <p class="hint">Click Start, then click Clarion and type below.</p>
     </div>
     <div class="route-row" id="route-row" hidden>
       <span class="pill" id="route-pill">/</span>
       <span class="pill accent" id="clicked-pill" hidden></span>
     </div>
-    <div class="modes" id="mode-bar" hidden>
-      <button type="button" data-mode="normal" class="active">Normal</button>
-      <button type="button" data-mode="explain_click">Explain click</button>
-      <button type="button" data-mode="element_picker">Pick element</button>
-    </div>
-    <div class="banner" id="implement-banner"></div>
-    <div class="chat-stream" id="chat-stream">
-      <p class="hint" id="chat-empty">
-        Stay on Clarion and click Start review. Then click the UI and describe
-        what should change — without leaving this panel.
-      </p>
-    </div>
     <form class="composer" id="composer" hidden>
       <div class="snap-preview" id="snap-preview"></div>
-      <textarea
-        id="feedback"
-        rows="3"
-        placeholder="Click Clarion, then describe what should change…"
-      ></textarea>
+      <p class="composer-lane" id="composer-lane"></p>
+      <div class="address-chips" id="address-chips"></div>
+      <textarea id="feedback" rows="3" placeholder="What should change?"></textarea>
       <div class="composer-actions">
         <button type="button" id="snap-btn">Snap</button>
         <button type="button" id="mic-btn">Mic</button>
+        <button type="button" id="clear-btn" title="Clear chat, change requests, and unbind the factory WO.">Clear</button>
+        <span class="spacer"></span>
+        <button type="button" id="note-btn" hidden>Post note</button>
         <button type="submit" id="send-btn" class="primary" disabled>Send</button>
       </div>
     </form>
     <details class="more">
-      <summary>Workspace</summary>
-      <div class="field">
-        <label for="workspace-path">Workspace path</label>
-        <input id="workspace-path" spellcheck="false" />
+      <summary>More</summary>
+      <div class="more-block" id="factory-strip" hidden>
+        <div class="more-label">Factory WO</div>
+        <div class="factory-bind" id="factory-bind">
+          <input id="factory-wo" placeholder="WO-1080" spellcheck="false" />
+          <button type="button" id="factory-bind-btn">Bind</button>
+        </div>
+        <div class="factory-live" id="factory-live"></div>
+      </div>
+      <div class="more-block" id="mode-bar" hidden>
+        <div class="more-label">Click mode</div>
+        <p class="hint" style="margin: 0 0 6px; text-align: left; font-size: 11px;">
+          Changes what is attached when you Send — not a highlighter on Clarion.
+        </p>
+        <div class="modes">
+          <button type="button" data-mode="normal" class="active" title="Attach recent clicks when you send">Normal</button>
+          <button type="button" data-mode="explain_this" title="Your last click is the subject of the next message">Explain click</button>
+          <button type="button" data-mode="element_picker" title="The next click in Clarion locks the element, then returns to Normal">Pick element</button>
+        </div>
+      </div>
+      <div class="more-block">
+        <div class="more-label">IDEs</div>
+        <div class="ide-bar" id="ide-bar"></div>
+        <div class="more-actions" style="margin-top: 8px;">
+          <button type="button" id="refresh-btn">Refresh IDEs</button>
+          <button type="button" id="options-btn">Settings</button>
+          <button type="button" id="open-studio-btn">Full studio</button>
+        </div>
       </div>
     </details>
+    <input id="workspace-path" type="hidden" />
     <script src="sidepanel.js"></script>
   </body>
 </html>

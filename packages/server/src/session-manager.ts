@@ -63,14 +63,23 @@ import {
   getThreadMessages,
   listFactoryAgents,
   listLiveWork,
+  listValidationQueue,
   postThreadMessage,
+  submitFactoryValidation,
   type FactoryThreadMessage,
+  type FactoryValidationVerdict,
 } from "./factory/client.js";
 import { exportArtifactToFactory } from "./factory/export.js";
 import {
   normalizeFactoryWoId,
   participantsFromThread,
 } from "./factory/participants.js";
+import {
+  factoryNoteAck,
+  factoryReviewerName,
+  resolveFeedbackDestination,
+  shouldAutoImplementOnApprove,
+} from "./factory/lanes.js";
 import {
   archiveAgentThreadHistory,
   createAgentThreadRecord,
@@ -435,6 +444,32 @@ export class SessionManager {
     return listFactoryAgents();
   }
 
+  listFactoryValidations() {
+    return listValidationQueue();
+  }
+
+  async submitFactoryValidation(
+    sessionId: string,
+    wo: string,
+    verdict: FactoryValidationVerdict,
+    notes?: string,
+  ): Promise<{ ok: true; wo: string; verdict: FactoryValidationVerdict }> {
+    const trimmedNotes = notes?.trim() ?? "";
+    if (verdict === "reject" && !trimmedNotes) {
+      throw new Error("A reject note is required.");
+    }
+    const runtime = await this.ensureRuntime(sessionId);
+    const decidedBy = factoryReviewerName(runtime.config);
+    const result = await submitFactoryValidation(wo, verdict, {
+      decidedBy,
+      notes: trimmedNotes,
+    });
+    if (!result.ok) {
+      throw new Error(result.error ?? "Factory validation failed");
+    }
+    return { ok: true, wo, verdict };
+  }
+
   async setFactoryAddressedTo(
     sessionId: string,
     agent: string | null,
@@ -533,7 +568,10 @@ export class SessionManager {
     const artifact = this.listArtifacts(sessionId).find((a) => a.id === artifactId);
     if (!artifact) throw new Error(`Artifact not found: ${artifactId}`);
     const result = await exportArtifactToFactory(artifact, session);
-    if (result.ok && result.woId && artifact.kind !== "doc_update" && artifact.kind !== "architecture_update") {
+    if (!result.ok) {
+      throw new Error(result.error ?? "Send to Factory failed");
+    }
+    if (result.woId && artifact.kind !== "doc_update" && artifact.kind !== "architecture_update") {
       const updated = { ...artifact, factoryWoId: result.woId };
       this.saveArtifact(updated);
       if (!session.factoryWo) {
@@ -555,10 +593,78 @@ export class SessionManager {
   }
 
   /**
-   * WO-1047 — relay a feedback moment to the bound WO's factory thread.
-   * Fire-and-forget from the caller's perspective: retries once on failure,
-   * then broadcasts a non-blocking status the Studio can show as a warning
-   * chip. Never throws — must not affect the local review flow either way.
+   * Post spatial feedback onto the bound WO thread. Does not talk to the
+   * review facilitator and does not interrupt the claiming runner.
+   */
+  private async completeFactoryNote(
+    sessionId: string,
+    session: ReviewSession,
+    moment: FeedbackMoment,
+    transcript: string,
+  ): Promise<SubmitFeedbackResponse> {
+    const wo = session.factoryWo;
+    if (!wo) {
+      throw new Error("Bind a factory WO before posting a note to the implementer.");
+    }
+
+    let screenshotBase64: string | undefined;
+    if (moment.screenshotId) {
+      try {
+        const bytes = await readFile(
+          getScreenshotPath(sessionId, moment.screenshotId),
+        );
+        screenshotBase64 = bytes.toString("base64");
+      } catch {
+        // Text-only notes are still useful on the thread.
+      }
+    }
+    this.relayEvidenceToFactory(sessionId, session, moment, screenshotBase64);
+
+    const userMessage: ChatMessage = {
+      id: createId("chat"),
+      sessionId,
+      role: "user",
+      content: transcript,
+      feedbackMomentId: moment.id,
+      channel: "factory_note",
+      timestamp: new Date().toISOString(),
+    };
+    const savedUser = this.persistChatMessage(userMessage);
+    this.broadcast(sessionId, { type: "chat_message", message: savedUser });
+
+    const who = session.factoryAddressedTo || session.factoryAgent;
+    const agentMessage: ChatMessage = {
+      id: createId("chat"),
+      sessionId,
+      role: "agent",
+      content: factoryNoteAck(wo, who),
+      feedbackMomentId: moment.id,
+      channel: "factory_note",
+      timestamp: new Date().toISOString(),
+    };
+    const savedAgent = this.persistChatMessage(agentMessage);
+    this.broadcast(sessionId, { type: "chat_message", message: savedAgent });
+
+    session.status = "reviewing";
+    session.updatedAt = new Date().toISOString();
+    this.store.saveSession(session);
+    void this.syncReviewHistory(sessionId);
+
+    return {
+      feedbackMoment: moment,
+      facilitatorResponse: {
+        interpretation: "unclear",
+        summary: savedAgent.content,
+        delegatedToIde: false,
+        skipAgentReply: true,
+      },
+      chatMessages: [savedUser, savedAgent],
+    };
+  }
+
+  /**
+   * Relay a factory note to the bound WO thread. Fire-and-forget: retries once
+   * on failure, then broadcasts a non-blocking status. Never throws.
    */
   private relayEvidenceToFactory(
     sessionId: string,
@@ -605,13 +711,20 @@ export class SessionManager {
     const modality = request.modality ?? "typed";
     const reviewMode = request.reviewMode ?? session.reviewMode;
     const transcript = request.transcript.trim();
-    if (request.addressedTo !== undefined) {
+    const destination = resolveFeedbackDestination(
+      request.destination,
+      session.factoryWo,
+    );
+    if (destination === "factory_note" && request.addressedTo !== undefined) {
       session.factoryAddressedTo = request.addressedTo;
     }
 
     const targetIde = resolveTargetIde(session, config);
 
-    if (/^(process\s+(my\s+)?(latest\s+)?oryntra|handoff(\s+to\s+ide)?)/i.test(transcript)) {
+    if (
+      destination !== "factory_note" &&
+      /^(process\s+(my\s+)?(latest\s+)?oryntra|handoff(\s+to\s+ide)?)/i.test(transcript)
+    ) {
       const agentMessage: ChatMessage = {
         id: createId("chat"),
         sessionId,
@@ -686,19 +799,8 @@ export class SessionManager {
     this.store.saveFeedbackMoment(moment);
     this.broadcast(sessionId, { type: "feedback_moment", moment });
 
-    if (session.factoryWo) {
-      let screenshotBase64: string | undefined;
-      if (capturedScreenshotId) {
-        try {
-          const bytes = await readFile(
-            getScreenshotPath(sessionId, capturedScreenshotId),
-          );
-          screenshotBase64 = bytes.toString("base64");
-        } catch {
-          // Evidence relay still proceeds without an image — text-only is fine.
-        }
-      }
-      this.relayEvidenceToFactory(sessionId, session, moment, screenshotBase64);
+    if (destination === "factory_note") {
+      return this.completeFactoryNote(sessionId, session, moment, transcript);
     }
 
     const userMessage: ChatMessage = {
@@ -872,7 +974,8 @@ export class SessionManager {
     config: OryntraConfig,
     approveOptions?: { cursorAgent?: "continue" | "new" },
   ): Promise<{ started: boolean; reason?: string } | undefined> {
-    if (config.agent?.autoImplementOnApprove === false) {
+    const session = this.getSession(sessionId);
+    if (!shouldAutoImplementOnApprove(config, session?.captureMode)) {
       return undefined;
     }
 
@@ -1111,6 +1214,25 @@ export class SessionManager {
       targetId,
       defaultThreadId,
     );
+  }
+
+  async clearChat(
+    sessionId: string,
+    threadId?: string,
+  ): Promise<{ ok: true; cleared: number }> {
+    if (!this.getSession(sessionId)) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    const messages = this.listChatMessages(sessionId, threadId);
+    this.store.deleteChatMessages(messages.map((message) => message.id));
+    this.store.deleteArtifactsForSession(sessionId);
+    this.store.deleteFeedbackMomentsForSession(sessionId);
+    const session = this.getSession(sessionId);
+    if (session?.factoryWo) {
+      await this.setFactoryWo(sessionId, null);
+    }
+    this.broadcast(sessionId, { type: "chat_cleared" });
+    return { ok: true, cleared: messages.length };
   }
 
   listAgentThreads(sessionId: string): AgentThread[] {

@@ -91,6 +91,12 @@ export class SessionStore {
     return rows.map((r) => JSON.parse(r.data) as FeedbackMoment);
   }
 
+  deleteFeedbackMomentsForSession(sessionId: string): void {
+    this.db
+      .prepare("DELETE FROM feedback_moments WHERE session_id = ?")
+      .run(sessionId);
+  }
+
   saveChatMessage(message: ChatMessage): void {
     this.db
       .prepare(
@@ -115,6 +121,14 @@ export class SessionStore {
       )
       .all(sessionId) as Array<{ data: string }>;
     return rows.map((r) => JSON.parse(r.data) as ChatMessage);
+  }
+
+  deleteChatMessages(ids: string[]): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => "?").join(",");
+    this.db
+      .prepare(`DELETE FROM chat_messages WHERE id IN (${placeholders})`)
+      .run(...ids);
   }
 
   saveAgentThread(thread: AgentThread): void {
@@ -169,6 +183,10 @@ export class SessionStore {
       .prepare("SELECT data FROM artifacts WHERE session_id = ? ORDER BY rowid ASC")
       .all(sessionId) as Array<{ data: string }>;
     return rows.map((r) => JSON.parse(r.data) as ReviewArtifact);
+  }
+
+  deleteArtifactsForSession(sessionId: string): void {
+    this.db.prepare("DELETE FROM artifacts WHERE session_id = ?").run(sessionId);
   }
 
   listSessionsForWorkspace(workspacePath: string): ReviewSession[] {

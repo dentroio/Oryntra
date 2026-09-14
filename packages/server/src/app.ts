@@ -371,6 +371,31 @@ export async function createApp(options: CreateAppOptions = {}) {
 
   app.get("/api/factory/agents", async () => manager.listFactoryAgents());
 
+  app.get("/api/factory/validations", async () => manager.listFactoryValidations());
+
+  app.post<{
+    Params: { id: string; wo: string };
+    Body: { verdict?: string; notes?: string };
+  }>("/api/sessions/:id/factory-validations/:wo", async (req, reply) => {
+    const verdict = req.body.verdict;
+    if (verdict !== "approve" && verdict !== "reject") {
+      return reply.code(400).send({ error: "verdict must be approve or reject" });
+    }
+    try {
+      return await manager.submitFactoryValidation(
+        req.params.id,
+        req.params.wo,
+        verdict,
+        req.body.notes,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Factory validation failed";
+      const code = /not active|not found/i.test(message) ? 404 : 400;
+      return reply.code(code).send({ error: message });
+    }
+  });
+
   app.get<{
     Querystring: { wo?: string; workspacePath?: string; appUrl?: string };
   }>("/api/factory/join", async (req, reply) => {
@@ -500,6 +525,18 @@ export async function createApp(options: CreateAppOptions = {}) {
   }>("/api/sessions/:id/chat", async (req) =>
     manager.listChatMessages(req.params.id, req.query.threadId),
   );
+
+  app.post<{
+    Params: { id: string };
+    Querystring: { threadId?: string };
+  }>("/api/sessions/:id/chat/clear", async (req, reply) => {
+    try {
+      return await manager.clearChat(req.params.id, req.query.threadId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Clear chat failed";
+      return reply.code(404).send({ error: message });
+    }
+  });
 
   app.get<{ Params: { id: string } }>(
     "/api/sessions/:id/agent-threads",

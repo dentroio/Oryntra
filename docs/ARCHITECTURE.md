@@ -13,7 +13,7 @@ Oryntra is a local, IDE-connected **interactive product review room** for web ap
 1. [Executive Summary](#1-executive-summary)
 2. [Design Principles](#2-design-principles)
 3. [Problem Statement](#3-problem-statement)
-4. [Architecture Overview](#4-architecture-overview)
+4. [Architecture Overview](#4-architecture-overview) (incl. [local daemon vs container](#42-local-daemon-vs-container))
 5. [Browser Interaction Model](#5-browser-interaction-model)
 6. [Review Room Web App](#6-review-room-web-app)
 7. [Interactive Agent Loop](#7-interactive-agent-loop)
@@ -116,15 +116,20 @@ Oryntra Local Backend  (Fastify, SQLite)
 | Component | Responsibilities | Implementation Notes |
 |-----------|------------------|----------------------|
 | **Review Room Web App** | Live session UI, transcript, spatial evidence strip, change requests, work orders, approval controls | React/Vite; WebSocket event stream |
-| **Oryntra Backend** | Session orchestration, spatial correlation, agent loop, persistence, API, security | Node.js/TypeScript, Fastify; localhost only |
+| **Oryntra Backend** | Session orchestration, spatial correlation, agent loop, persistence, API, security | Node.js/TypeScript, Fastify; **local daemon** on localhost (not co-containerized with the factory) |
 | **Browser Extension** | Enterprise capture from real browser tab; side panel Review Studio; IDE chips | Chrome MV3; `@oryntra/browser-extension` |
 | **IDE Registry** | Multi-IDE heartbeat, probe, session `preferredIde` | In-process registry on backend |
 | **Browser Automation** | Spatial capture via extension bridge, embedded bridge, or Playwright | `@oryntra/browser-service` |
 | **IDE Bridge** | Launch sessions, MCP tools, handoff to coding agents | MCP stdio; VS Code extension planned |
 | **Review Facilitator** | Clarify feedback, resolve elements, draft artifacts, interactive Q&A | LLM via configured provider; session-scoped |
 | **Execution Agent Provider** | Apply approved artifacts in IDE workspace (docs, code, tests) | Provider abstraction; runs in IDE via MCP |
+| **Agentic Factory (peer)** | Optional WO dispatch / runners; create WO, notes, validation | Separate service; HTTP client in `@oryntra/server` → default `:8099` |
 | **Workspace Manager** | Detect repo, Git worktree (lazy), run allowlisted commands | Worktree created on first approved patch (Phase 4+) |
 | **Persistence** | Sessions, feedback moments, events, artifacts, patches, test results | SQLite for MVP |
+
+### 4.2 Local daemon vs container
+
+Oryntra binds to **localhost** and integrates with the host browser, IDE MCP, and workspace filesystem. The supported runtime is a **local Node service/daemon** (CLI, `npm run dev`, or background pid-file daemon) — not a Docker Compose unit shared with Clarion or the factory. The factory is an optional **peer API**. Full workflow and env vars: [FACTORY.md](./FACTORY.md).
 
 ---
 

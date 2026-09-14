@@ -30,6 +30,7 @@ type FactoryAgent = {
   name: string;
   domainFilter: string;
   daemonLoaded: boolean;
+  cliDetected?: boolean;
 };
 
 type Props = {
@@ -49,6 +50,19 @@ type Props = {
 };
 
 const POLL_MS = 5000;
+
+function runnerName(name: string): string {
+  return name.replace(/-runner$/i, "");
+}
+
+function statusPhrase(status: string | null | undefined): string {
+  const raw = (status || "").replace(/_/g, " ");
+  if (raw === "in progress") return "in progress";
+  if (raw === "awaiting human") return "awaiting review";
+  if (raw === "awaiting commit") return "awaiting commit";
+  if (raw === "claimed") return "claimed";
+  return raw || "queued";
+}
 
 function labelForWork(item: LiveWork): string {
   const agent = item.agent || "unclaimed";
@@ -73,6 +87,10 @@ export function FactoryPanel({
   const [messages, setMessages] = useState<FactoryThreadMessage[]>([]);
   const [participants, setParticipants] = useState<FactoryParticipant[]>([]);
   const [threadOpen, setThreadOpen] = useState(true);
+  const [factoryOk, setFactoryOk] = useState(true);
+  const [validationQueue, setValidationQueue] = useState<LiveWork[]>([]);
+  const [rejectNotes, setRejectNotes] = useState("");
+  const [verdictBusy, setVerdictBusy] = useState(false);
 
   async function bind(wo: string | null) {
     setBinding(true);
@@ -106,13 +124,44 @@ export function FactoryPanel({
     }
   }
 
+  async function submitVerdict(verdict: "approve" | "reject") {
+    if (!factoryWo) return;
+    if (verdict === "reject" && !rejectNotes.trim()) {
+      setError("A reject note is required.");
+      return;
+    }
+    setVerdictBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/sessions/${sessionId}/factory-validations/${encodeURIComponent(factoryWo)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            verdict,
+            notes: rejectNotes.trim(),
+          }),
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "Verdict failed");
+      setRejectNotes("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Verdict failed");
+    } finally {
+      setVerdictBusy(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function refreshRoster() {
       try {
-        const [workRes, agentRes] = await Promise.all([
+        const [workRes, agentRes, queueRes] = await Promise.all([
           fetch("/api/factory/live-work"),
           fetch("/api/factory/agents"),
+          fetch("/api/factory/validations"),
         ]);
         if (cancelled) return;
         if (workRes.ok) {
@@ -121,8 +170,18 @@ export function FactoryPanel({
         if (agentRes.ok) {
           setAgents((await agentRes.json()) as FactoryAgent[]);
         }
+        if (queueRes.ok) {
+          const body = (await queueRes.json()) as {
+            factoryOk?: boolean;
+            items?: LiveWork[];
+          };
+          setFactoryOk(body.factoryOk !== false);
+          setValidationQueue(body.items ?? []);
+        } else {
+          setFactoryOk(false);
+        }
       } catch {
-        // Factory optional — scratch review still works.
+        if (!cancelled) setFactoryOk(false);
       }
     }
     void refreshRoster();
@@ -183,9 +242,16 @@ export function FactoryPanel({
     };
   }, [sessionId, factoryWo]);
 
-  const otherLive = liveWork.filter((item) => item.wo !== factoryWo);
-  const loadedAgents = agents.filter((a) => a.daemonLoaded);
+  const boundLive = liveWork.find((item) => item.wo === factoryWo);
+  const otherLive = liveWork.filter(
+    (item) => item.wo !== factoryWo && item.status !== "awaiting_human",
+  );
+  const loadedAgents = agents.filter((a) => a.daemonLoaded || a.cliDetected);
+  const runnerList =
+    loadedAgents.map((a) => a.name).join(", ") ||
+    "claude, cursor, codex, or gemini";
   const talkingTo = factoryAddressedTo || factoryAgent;
+  const claimed = Boolean(boundLive?.status && boundLive.status !== "queued");
   const roster = (() => {
     const byName = new Map<string, FactoryParticipant>();
     for (const person of participants) byName.set(person.name, person);
@@ -209,7 +275,9 @@ export function FactoryPanel({
         <span className="factory-panel-title">Factory</span>
         {factoryWo ? (
           <span className="tag factory-wo-tag">
-            {talkingTo ? `${talkingTo} · ${factoryWo}` : factoryWo}
+            {claimed && talkingTo
+              ? `${runnerName(talkingTo)} · ${factoryWo}`
+              : `${factoryWo} · queued`}
           </span>
         ) : (
           <span className="muted">Scratch review</span>
@@ -217,11 +285,38 @@ export function FactoryPanel({
       </div>
 
       {factoryWo ? (
+        <>
         <p className="factory-mode-hint">
-          Correcting {talkingTo || "the claiming agent"} on {factoryWo}
-          {factorySlug ? ` (${factorySlug})` : ""}. Pick a participant to
-          address; feedback stays on this WO thread.
+          Bound to {factoryWo}
+          {factorySlug ? ` (${factorySlug})` : ""}. Send talks to Oryntra
+          (thread is memory only). Post note steers{" "}
+          {talkingTo ? runnerName(talkingTo) : "whoever claims it"} without
+          interrupting this pass.
         </p>
+        <p className="factory-progress">
+          {claimed && boundLive ? (
+            <>
+              {statusPhrase(boundLive.status)}
+              {boundLive.step ? ` · ${boundLive.step}` : ""}
+              {boundLive.prUrl ? (
+                <>
+                  {" · "}
+                  <a
+                    href={boundLive.prUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    PR
+                  </a>
+                </>
+              ) : null}
+              . Notes won&apos;t interrupt.
+            </>
+          ) : (
+            <>Waiting for an idle runner ({runnerList}).</>
+          )}
+        </p>
+        </>
       ) : (
         <p className="factory-mode-hint">
           {loadedAgents.length > 0
@@ -232,11 +327,35 @@ export function FactoryPanel({
 
       {relayWarning ? (
         <p className="factory-relay-warning" title={relayWarning}>
-          Feedback relay to factory failed — review continues locally.
+          Feedback note failed to reach the factory thread — review continues locally.
         </p>
       ) : null}
 
+      {!factoryOk ? (
+        <p className="factory-offline">Factory is offline — validation queue unavailable.</p>
+      ) : null}
+
       {error ? <p className="error-text">{error}</p> : null}
+
+      {validationQueue.length > 0 ? (
+        <div className="factory-live-list">
+          <div className="factory-live-heading">Awaiting your review</div>
+          {validationQueue.map((item) => (
+            <button
+              key={item.wo}
+              type="button"
+              className={`factory-live-item${
+                item.wo === factoryWo ? " factory-live-item-bound" : ""
+              }`}
+              disabled={binding}
+              onClick={() => void bind(item.wo)}
+            >
+              <span className="factory-live-label">{labelForWork(item)}</span>
+              <span className="muted">awaiting_human</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {otherLive.length > 0 ? (
         <div className="factory-live-list">
@@ -300,6 +419,39 @@ export function FactoryPanel({
             Unbind — scratch review
           </button>
 
+          {validationQueue.some((item) => item.wo === factoryWo) ? (
+            <div className="factory-verdict">
+              <p className="factory-mode-hint">
+                Inspect with Send. Post note to add evidence, then approve or
+                reject. Reject requires a note on the WO thread.
+              </p>
+              <textarea
+                value={rejectNotes}
+                onChange={(e) => setRejectNotes(e.target.value)}
+                rows={2}
+                placeholder="Reject note (required to reject)"
+                disabled={verdictBusy}
+              />
+              <div className="factory-verdict-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={verdictBusy}
+                  onClick={() => void submitVerdict("approve")}
+                >
+                  Approve WO
+                </button>
+                <button
+                  type="button"
+                  disabled={verdictBusy}
+                  onClick={() => void submitVerdict("reject")}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {messages.length > 0 ? (
             <div className="factory-agent-strip">
               <button
@@ -332,7 +484,10 @@ export function FactoryPanel({
               ) : null}
             </div>
           ) : (
-            <p className="muted">No factory thread yet — first feedback will start it.</p>
+            <p className="muted">
+              No factory thread yet — Post note to steer whoever claims this WO
+              (claude, cursor, codex, or gemini).
+            </p>
           )}
         </div>
       ) : (
