@@ -300,7 +300,10 @@ async function refreshIdes(workspacePath) {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = `ide-chip${ide.connected ? " connected" : ""}${ide.provider === selected ? " selected" : ""}`;
-    chip.title = `${ide.source}${ide.provider === selected ? " · selected for handoff" : ""}`;
+    chip.title =
+      ide.provider === "factory"
+        ? `Factory queue${ide.provider === selected ? " · selected — Send to Factory after Approve" : ""}`
+        : `${ide.source}${ide.provider === selected ? " · selected for handoff" : ""}`;
     chip.textContent = `${ide.label}${ide.connected ? " ●" : ""}`;
     chip.addEventListener("click", () => {
       void setPreferredIde(ide.provider);

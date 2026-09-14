@@ -18,6 +18,7 @@ import type {
   BrowserState,
   ChatMessage,
   FeedbackMoment,
+  IdeRegistration,
   ReviewArtifact,
   ReviewMode,
   ReviewSession,
@@ -131,6 +132,7 @@ export function SessionPage() {
     previewUrl?: string;
   } | null>(null);
   const [snapping, setSnapping] = useState(false);
+  const [ides, setIdes] = useState<IdeRegistration[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -260,6 +262,7 @@ export function SessionPage() {
   const usesIdeFacilitator = session?.facilitatorProvider === "ide";
   const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
   const factoryBound = Boolean(session?.factoryWo);
+  const factoryHandoff = session?.preferredIde === "factory";
   const factoryNoteTarget =
     session?.factoryAddressedTo ||
     session?.factoryAgent ||
@@ -315,6 +318,82 @@ export function SessionPage() {
   // Clarion (or any live app) lives in another tab. Don't leave an empty
   // black stage that crowds out chat in the Review Room window.
   const hideAppStage = sidePanelLayout || extensionMode;
+
+  useEffect(() => {
+    if (!session?.workspacePath) return undefined;
+    let cancelled = false;
+
+    async function refreshIdes() {
+      const query = `?workspacePath=${encodeURIComponent(session!.workspacePath)}`;
+      const res = await fetch(`${apiBase}/api/ide/available${query}`);
+      if (!res.ok || cancelled) return;
+      const data = (await res.json()) as { ides?: IdeRegistration[] };
+      const list = data.ides ?? [];
+      const connectedProviders = new Set(
+        list
+          .filter((ide) => ide.connected && ide.source !== "extension")
+          .map((ide) => ide.provider),
+      );
+      const visible = list.filter((ide) => {
+        if (ide.source === "extension") return false;
+        if (ide.source === "probe" && connectedProviders.has(ide.provider)) {
+          return false;
+        }
+        return true;
+      });
+      if (!cancelled) setIdes(visible);
+    }
+
+    void refreshIdes();
+    const timer = window.setInterval(() => void refreshIdes(), 15_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [apiBase, session?.workspacePath]);
+
+  async function setPreferredIde(provider: IdeRegistration["provider"]) {
+    if (!sessionId) return;
+    try {
+      const res = await fetch(`${apiBase}/api/sessions/${sessionId}/preferred-ide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferredIde: provider }),
+      });
+      if (!res.ok) return;
+      const next = (await res.json()) as ReviewSession;
+      setSession(next);
+    } catch {
+      // chip stays on last known session preferredIde
+    }
+  }
+
+  function renderIdeChips() {
+    if (ides.length === 0) return null;
+    const selected = session?.preferredIde ?? session?.ide ?? "cursor";
+    return (
+      <div className="ide-bar" role="group" aria-label="Execution target">
+        {ides.map((ide) => (
+          <button
+            key={`${ide.provider}:${ide.clientId}`}
+            type="button"
+            className={`ide-chip${ide.connected ? " connected" : ""}${
+              ide.provider === selected ? " selected" : ""
+            }`}
+            title={
+              ide.provider === "factory"
+                ? "Queue a WO for idle factory runners (Send to Factory)"
+                : `${ide.source}${ide.provider === selected ? " · selected for handoff" : ""}`
+            }
+            onClick={() => void setPreferredIde(ide.provider)}
+          >
+            {ide.label}
+            {ide.connected ? " ●" : ""}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   useEffect(() => {
     activeThreadIdRef.current = activeThread?.id ?? null;
@@ -952,6 +1031,7 @@ export function SessionPage() {
           <span className="studio-sub">Review Studio</span>
         </div>
         <div className="studio-status">
+          {renderIdeChips()}
           <span className="status-pill">
             {shortRoute(browserState?.route ?? session?.appUrl ?? "/")}
           </span>
@@ -977,13 +1057,18 @@ export function SessionPage() {
               </span>
             </div>
           ) : null}
+          {ides.length > 0 ? (
+            <div className="compact-status-row">{renderIdeChips()}</div>
+          ) : null}
         </header>
       )}
 
       {!sidePanelLayout ? (
       <div className="studio-collab-hint">
         {extensionMode
-          ? "Click your app tab, send feedback here — Cursor Agent replies below."
+          ? factoryHandoff
+            ? "Click your app tab, send feedback here — Approve, then Send to Factory."
+            : "Click your app tab, send feedback here — Cursor Agent replies below."
           : "Click the app, send feedback in chat — your "}
         {!extensionMode ? (
           <>
@@ -1332,6 +1417,7 @@ export function SessionPage() {
                               >
                                 Approve
                               </button>
+                              {!factoryHandoff ? (
                               <button
                                 type="button"
                                 className="secondary"
@@ -1352,6 +1438,7 @@ export function SessionPage() {
                               >
                                 New agent
                               </button>
+                              ) : null}
                               <button
                                 type="button"
                                 className="secondary"

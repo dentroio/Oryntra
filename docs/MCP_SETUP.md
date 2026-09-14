@@ -49,7 +49,7 @@ Set `ORYNTRA_IDE` to register your IDE with the Oryntra IDE Registry:
 
 Give each IDE a distinct `ORYNTRA_MCP_CLIENT_ID` (for example `mcp:cursor` and `mcp:vscode`) so both can stay connected at once.
 
-The extension side panel shows connected IDEs. Click a chip to set **preferred IDE** for handoff. Only the matching MCP client processes pending feedback when `preferredIde` is set.
+The extension side panel shows connected IDEs. Click a chip to set **preferred IDE** for handoff. Only the matching MCP client processes pending feedback when `preferredIde` is set. **Factory** means Send to Factory after Approve — MCP implement is skipped.
 
 ## VS Code (Copilot, Claude, Codex)
 

@@ -266,16 +266,17 @@ IDE (Cursor / VS Code / Windsurf / …)
 |----------|---------|
 | `POST /api/ide/heartbeat` | MCP, extension, or CLI registers `{ provider, clientId, workspacePath, source }` |
 | `GET /api/ide/connected` | Live MCP/extension connections (90s TTL) |
-| `GET /api/ide/available` | Connected + probed installed IDEs |
+| `GET /api/ide/available` | Connected + probed installed IDEs + Factory chip when dispatch is reachable |
 | `POST /api/sessions/:id/preferred-ide` | Set handoff target for session |
 
-**Providers:** `cursor` · `vscode` · `windsurf` · `jetbrains` · `zed` · `other`
+**Providers:** `cursor` · `vscode` · `windsurf` · `jetbrains` · `zed` · `factory` · `other`
 
 Detection sources:
 
 1. **MCP heartbeat** — `ORYNTRA_IDE=cursor` (or vscode, etc.) on MCP startup and every 30s
 2. **Extension heartbeat** — browser extension registers while side panel is active
 3. **Local probe** — server checks for installed app bundles / CLI binaries
+4. **Factory probe** — `GET {FACTORY_URL}/api/factory/dispatch`; chip is omitted when the factory is down
 
 ### 8.2 Cursor (MCP — primary)
 

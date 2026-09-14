@@ -23,6 +23,14 @@ async function assertIdeTarget(sessionId: string): Promise<
   const session = await client.getSession(sessionId);
   const caller = resolveIdeProvider();
   const target = session.preferredIde ?? session.ide ?? "cursor";
+  if (target === "factory") {
+    return {
+      ok: false,
+      skipped: true,
+      reason:
+        "Session targets Factory. Approve then Send to Factory — do not implement via MCP.",
+    };
+  }
   if (target !== "other" && target !== caller) {
     return {
       ok: false,

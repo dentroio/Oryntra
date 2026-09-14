@@ -39,11 +39,14 @@ export function factoryReviewerName(config?: OryntraConfig | null): string {
 /**
  * Approve queues a factory WO; local Cursor implement is opt-in.
  * Extension reviews stay factory-first unless yaml sets autoImplementOnApprove: true.
+ * Factory as preferred IDE never auto-starts a local implementer.
  */
 export function shouldAutoImplementOnApprove(
   config: Pick<OryntraConfig, "agent"> | null | undefined,
   captureMode?: string | null,
+  preferredIde?: string | null,
 ): boolean {
+  if (preferredIde === "factory") return false;
   const flag = config?.agent?.autoImplementOnApprove;
   if (flag === false) return false;
   if (captureMode === "extension") return flag === true;

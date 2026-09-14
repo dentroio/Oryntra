@@ -7,6 +7,7 @@ export const IDE_PROVIDERS: IdeProvider[] = [
   "jetbrains",
   "zed",
   "antigravity",
+  "factory",
   "other",
 ];
 
@@ -17,6 +18,7 @@ export const IDE_LABELS: Record<IdeProvider, string> = {
   jetbrains: "JetBrains",
   zed: "Zed",
   antigravity: "Antigravity",
+  factory: "Factory",
   other: "Other IDE",
 };
 

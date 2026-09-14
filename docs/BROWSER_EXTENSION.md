@@ -86,11 +86,11 @@ POST /api/ide/heartbeat
 
 Response lists each IDE with `provider`, `label`, `connected`, and `source`.
 
-The side panel shows **IDE chips** — green when MCP-connected. Handoff uses `preferredIde` on the session (set from extension settings or `POST /api/sessions/:id/preferred-ide`).
+The side panel shows **IDE chips** — green when MCP-connected. A **Factory** chip appears only when the factory dispatch API is reachable; selecting it sets handoff to **Send to Factory** instead of MCP. Handoff uses `preferredIde` on the session (set from extension settings or `POST /api/sessions/:id/preferred-ide`).
 
 ### Supported IDE providers
 
-`cursor` · `vscode` · `windsurf` · `jetbrains` · `zed` · `other`
+`cursor` · `vscode` · `windsurf` · `jetbrains` · `zed` · `factory` · `other`
 
 Add new providers in `@oryntra/core` `IdeProvider` and register via MCP `ORYNTRA_IDE` env.
 
