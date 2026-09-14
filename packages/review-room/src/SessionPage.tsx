@@ -1,6 +1,5 @@
 import {
   type CSSProperties,
-  FormEvent,
   type MouseEvent,
   useCallback,
   useEffect,
@@ -260,6 +259,11 @@ export function SessionPage() {
 
   const usesIdeFacilitator = session?.facilitatorProvider === "ide";
   const ideLabel = getIdeLabel(session?.preferredIde ?? session?.ide ?? "cursor");
+  const factoryBound = Boolean(session?.factoryWo);
+  const factoryNoteTarget =
+    session?.factoryAddressedTo ||
+    session?.factoryAgent ||
+    "whoever claims it";
 
   useEffect(() => {
     if (!awaitingMomentId) return;
@@ -359,6 +363,33 @@ export function SessionPage() {
       setSubmitting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "New agent failed");
+    } finally {
+      setAgentBusy(false);
+    }
+  }
+
+  async function clearChatWindow() {
+    if (!sessionId || agentBusy || viewingHistory) return;
+    setAgentBusy(true);
+    setError(null);
+    try {
+      const query = activeThread?.id
+        ? `?threadId=${encodeURIComponent(activeThread.id)}`
+        : "";
+      const res = await fetch(
+        `${apiBase}/api/sessions/${sessionId}/chat/clear${query}`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? "Could not clear chat");
+      }
+      setChat([]);
+      setArtifacts([]);
+      setFeedbackMoments([]);
+      setImplementBanner(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear chat");
     } finally {
       setAgentBusy(false);
     }
@@ -531,6 +562,13 @@ export function SessionPage() {
         case "factory_relay_status":
           setFactoryRelayWarning(data.ok ? null : (data.error ?? "Relay to factory failed"));
           break;
+        case "chat_cleared":
+          if (viewingThreadIdRef.current !== null) break;
+          setChat([]);
+          setArtifacts([]);
+          setFeedbackMoments([]);
+          setImplementBanner(null);
+          break;
         case "implement_status":
           if (data.status === "completed") {
             if (pollRef.current) clearInterval(pollRef.current);
@@ -685,6 +723,40 @@ export function SessionPage() {
     }
   }
 
+  async function sendArtifactToFactory(artifactId: string) {
+    if (!sessionId) return;
+    setApprovingId(artifactId);
+    setError(null);
+    try {
+      const res = await fetch(
+        `${apiBase}/api/sessions/${sessionId}/artifacts/${artifactId}/export-factory`,
+        { method: "POST" },
+      );
+      const body = (await res.json()) as {
+        ok?: boolean;
+        woId?: string;
+        error?: string;
+        artifact?: ReviewArtifact;
+      };
+      if (!res.ok || body.ok === false) {
+        throw new Error(body.error ?? "Send to Factory failed");
+      }
+      if (body.artifact) {
+        setArtifacts((prev) => {
+          const idx = prev.findIndex((a) => a.id === body.artifact!.id);
+          if (idx < 0) return [...prev, body.artifact!];
+          const next = [...prev];
+          next[idx] = body.artifact!;
+          return next;
+        });
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Send to Factory failed");
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
   function startSpeechInput() {
     type SpeechRecognitionLike = {
       lang: string;
@@ -763,7 +835,10 @@ export function SessionPage() {
     }
   }
 
-  async function onSubmitFeedback(e: FormEvent) {
+  async function onSubmitFeedback(
+    e: { preventDefault(): void },
+    destination: "review" | "factory_note" = "review",
+  ) {
     e.preventDefault();
     if (!sessionId || !feedback.trim()) return;
     setSubmitting(true);
@@ -781,7 +856,13 @@ export function SessionPage() {
           reviewMode,
           screenshotId: stagedSnap?.screenshotId,
           accessibilitySnapshotId: stagedSnap?.accessibilitySnapshotId,
-          addressedTo: session?.factoryAddressedTo ?? session?.factoryAgent ?? null,
+          destination,
+          ...(destination === "factory_note"
+            ? {
+                addressedTo:
+                  session?.factoryAddressedTo ?? session?.factoryAgent ?? null,
+              }
+            : {}),
         }),
       });
       if (!res.ok) {
@@ -1075,15 +1156,31 @@ export function SessionPage() {
                         : ""}
                     </button>
                     {!viewingHistory ? (
-                      <button
-                        type="button"
-                        className="agent-thread-btn agent-thread-new"
-                        onClick={() => void startNewAgentThread()}
-                        disabled={agentBusy}
-                        title="Start a fresh agent chat (current agent moves to history)"
-                      >
-                        + New agent
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="secondary agent-thread-btn"
+                          onClick={() => void clearChatWindow()}
+                          disabled={
+                            agentBusy ||
+                            (chat.length === 0 &&
+                              artifacts.length === 0 &&
+                              !session?.factoryWo)
+                          }
+                          title="Clear chat, change requests, and unbind the factory WO."
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          className="agent-thread-btn agent-thread-new"
+                          onClick={() => void startNewAgentThread()}
+                          disabled={agentBusy}
+                          title="Start a fresh agent chat (current agent moves to history)"
+                        >
+                          + New agent
+                        </button>
+                      </>
                     ) : null}
                   </div>
                 </div>
@@ -1174,9 +1271,13 @@ export function SessionPage() {
               <div className="chat-stream">
                 {chat.length === 0 ? (
                   <p className="hint">
-                    {extensionMode || sidePanelLayout
-                      ? "Click your Clarion tab — the route above updates. Then describe what should change."
-                      : "Click around the app on the left, then type or tap the mic to describe what should change."}
+                    {factoryBound
+                      ? session?.factoryAgent
+                        ? `Send talks to Oryntra. Post note steers ${factoryNoteTarget} on ${session?.factoryWo} without interrupting this pass.`
+                        : `Queued ${session?.factoryWo}. Any idle factory runner (claude, cursor, codex, or gemini) can claim it.`
+                      : extensionMode || sidePanelLayout
+                        ? "Click your Clarion tab — the route above updates. Then describe what should change."
+                        : "Click around the app on the left, then type or tap the mic to describe what should change."}
                   </p>
                 ) : (
                   chat.map((message) => {
@@ -1185,10 +1286,15 @@ export function SessionPage() {
                       ? momentById.get(message.feedbackMomentId)
                       : undefined;
                     return (
-                      <div
-                        key={message.id}
-                        className={`chat-turn chat-turn-${message.role}`}
-                      >
+                        <div
+                          key={message.id}
+                          className={`chat-turn chat-turn-${message.role}${
+                            message.channel === "factory_note" ? " chat-turn-note" : ""
+                          }`}
+                        >
+                        {message.channel === "factory_note" ? (
+                          <span className="chat-channel-label">WO note</span>
+                        ) : null}
                         <ChatBubble
                           role={message.role}
                           content={message.content}
@@ -1258,7 +1364,40 @@ export function SessionPage() {
                               </button>
                             </div>
                           </div>
-                        ) : null}
+                        ) : message.role === "agent" &&
+                          message.artifactId &&
+                          !viewingHistory
+                          ? (() => {
+                              const artifact = artifacts.find(
+                                (a) => a.id === message.artifactId,
+                              );
+                              if (
+                                artifact?.status !== "approved" ||
+                                artifact.factoryWoId
+                              ) {
+                                return null;
+                              }
+                              return (
+                                <div className="chat-proposal">
+                                  <p className="chat-proposal-summary">
+                                    Approved — queue this as a factory WO for idle
+                                    runners.
+                                  </p>
+                                  <div className="chat-proposal-actions">
+                                    <button
+                                      type="button"
+                                      disabled={approvingId === artifact.id}
+                                      onClick={() =>
+                                        void sendArtifactToFactory(artifact.id)
+                                      }
+                                    >
+                                      Send to Factory
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          : null}
                       </div>
                     );
                   })
@@ -1287,8 +1426,16 @@ export function SessionPage() {
                 <textarea
                   value={feedback}
                   onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="Click the app, then describe what should change…"
-                  title={`Replies come from your ${ideLabel} Agent via MCP`}
+                  placeholder={
+                    factoryBound
+                      ? "Talking to Oryntra. Use Post note to steer the WO."
+                      : "Click the app, then describe what should change…"
+                  }
+                  title={
+                    factoryBound
+                      ? `Send replies come from your ${ideLabel} Agent. Post note goes to ${factoryNoteTarget} on ${session?.factoryWo}.`
+                      : `Replies come from your ${ideLabel} Agent via MCP`
+                  }
                   rows={3}
                   disabled={submitting || listening || viewingHistory}
                 />
@@ -1312,6 +1459,28 @@ export function SessionPage() {
                     {listening ? "Listening…" : "Mic"}
                   </button>
                   <button
+                    type="button"
+                    className="secondary"
+                    hidden={!factoryBound}
+                    disabled={
+                      submitting ||
+                      listening ||
+                      viewingHistory ||
+                      !feedback.trim() ||
+                      !factoryBound
+                    }
+                    title={
+                      factoryBound
+                        ? `Post to ${session?.factoryWo} for ${factoryNoteTarget}. They finish this pass first.`
+                        : undefined
+                    }
+                    onClick={(event) =>
+                      void onSubmitFeedback(event, "factory_note")
+                    }
+                  >
+                    Post note
+                  </button>
+                  <button
                     type="submit"
                     disabled={
                       submitting ||
@@ -1322,7 +1491,9 @@ export function SessionPage() {
                     title={
                       waitingForIde
                         ? `Waiting for ${ideLabel} Agent response…`
-                        : undefined
+                        : factoryBound
+                          ? "Talk to Oryntra (does not post to the factory thread)"
+                          : undefined
                     }
                   >
                     {waitingForIde ? "Waiting…" : "Send"}

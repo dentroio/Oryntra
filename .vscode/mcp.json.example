@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "oryntra": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/ABSOLUTE/PATH/TO/oryntra/packages/mcp/dist/index.js"
+      ],
+      "env": {
+        "ORYNTRA_URL": "http://127.0.0.1:4317",
+        "ORYNTRA_WORKSPACE": "/ABSOLUTE/PATH/TO/the-app-you-are-reviewing",
+        "ORYNTRA_IDE": "vscode",
+        "ORYNTRA_MCP_CLIENT_ID": "mcp:vscode"
+      }
+    }
+  }
+}

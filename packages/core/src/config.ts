@@ -16,6 +16,8 @@ export type OryntraConfig = {
     mouseSampleIntervalMs?: number;
     recentEventWindowSeconds?: number;
     recentEventMaxCount?: number;
+    /** Name posted as factory `decided_by` on Approve/Reject. */
+    author?: string;
   };
   agent?: {
     facilitatorProvider?: string;
@@ -51,6 +53,38 @@ export type OryntraConfig = {
   };
 };
 
+const AGENT_KEYS_FROM_REVIEW = [
+  "facilitatorProvider",
+  "executionProvider",
+  "autoImplementOnApprove",
+  "implementInWorkspace",
+  "cursorAgent",
+  "openCursorAgentOnCollaborate",
+] as const;
+
+function liftAgentSettings(
+  override: Partial<OryntraConfig>,
+): OryntraConfig["agent"] {
+  const review = override.review as
+    | (NonNullable<OryntraConfig["review"]> & Record<string, unknown>)
+    | undefined;
+  const lifted: Record<string, unknown> = {};
+  if (review) {
+    for (const key of AGENT_KEYS_FROM_REVIEW) {
+      if (review[key] !== undefined && override.agent?.[key] === undefined) {
+        lifted[key] = review[key];
+      }
+    }
+  }
+  return { ...lifted, ...override.agent } as OryntraConfig["agent"];
+}
+
+export function resolveOryntraConfig(
+  override: Partial<OryntraConfig> = {},
+): OryntraConfig {
+  return mergeConfig(DEFAULT_CONFIG, override);
+}
+
 const DEFAULT_CONFIG: OryntraConfig = {
   project: { name: "app", root: "." },
   app: { url: "http://localhost:3000" },
@@ -85,7 +119,7 @@ export async function loadOryntraConfig(
   try {
     const raw = await readFile(configPath, "utf8");
     const parsed = parseYaml(raw) as Partial<OryntraConfig>;
-    return mergeConfig(DEFAULT_CONFIG, parsed);
+    return resolveOryntraConfig(parsed);
   } catch {
     return { ...DEFAULT_CONFIG };
   }
@@ -100,7 +134,7 @@ function mergeConfig(
     app: { ...base.app, ...override.app },
     ide: { ...base.ide, ...override.ide },
     review: { ...base.review, ...override.review },
-    agent: { ...base.agent, ...override.agent },
+    agent: { ...base.agent, ...liftAgentSettings(override) },
     browser: {
       ...base.browser,
       ...override.browser,

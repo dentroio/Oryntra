@@ -2,6 +2,7 @@ const API_BASE = "http://127.0.0.1:4317";
 const DEFAULT_WORKSPACE = "/Users/stevengerhart/workspace/github/sgerhart/clarion";
 
 const metaEl = document.getElementById("session-meta");
+const ideStatusEl = document.getElementById("ide-status");
 const ideBar = document.getElementById("ide-bar");
 const statusEl = document.getElementById("status");
 const startBtn = document.getElementById("start-btn");
@@ -13,8 +14,12 @@ const chatStream = document.getElementById("chat-stream");
 const composer = document.getElementById("composer");
 const feedbackEl = document.getElementById("feedback");
 const sendBtn = document.getElementById("send-btn");
+const noteBtn = document.getElementById("note-btn");
+const composerLane = document.getElementById("composer-lane");
+const addressChips = document.getElementById("address-chips");
 const snapBtn = document.getElementById("snap-btn");
 const micBtn = document.getElementById("mic-btn");
+const clearBtn = document.getElementById("clear-btn");
 const snapPreview = document.getElementById("snap-preview");
 const routeRow = document.getElementById("route-row");
 const routePill = document.getElementById("route-pill");
@@ -23,11 +28,18 @@ const modeBar = document.getElementById("mode-bar");
 const implementBanner = document.getElementById("implement-banner");
 const factoryStrip = document.getElementById("factory-strip");
 const factoryLabel = document.getElementById("factory-label");
+const factoryDetail = document.getElementById("factory-detail");
+const factoryPr = document.getElementById("factory-pr");
 const factoryUnbindBtn = document.getElementById("factory-unbind-btn");
+const factoryApproveBtn = document.getElementById("factory-approve-btn");
+const factoryRejectBtn = document.getElementById("factory-reject-btn");
 const factoryBind = document.getElementById("factory-bind");
 const factoryWoInput = document.getElementById("factory-wo");
 const factoryBindBtn = document.getElementById("factory-bind-btn");
 const factoryLive = document.getElementById("factory-live");
+const boundBar = document.getElementById("bound-bar");
+
+let statusClearTimer = null;
 
 const state = {
   sessionId: null,
@@ -44,6 +56,11 @@ const state = {
   factoryWo: null,
   factoryAgent: null,
   factoryAddressedTo: null,
+  factoryParticipants: [],
+  factoryStatus: null,
+  factoryStep: null,
+  factoryPrUrl: null,
+  factoryAgents: [],
 };
 
 function isHttpAppUrl(url) {
@@ -76,8 +93,27 @@ function isOryntraUi(url) {
 }
 
 function setStatus(text, isError = false) {
-  statusEl.textContent = text;
+  if (statusClearTimer) {
+    clearTimeout(statusClearTimer);
+    statusClearTimer = null;
+  }
+  const message = (text || "").trim();
+  statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+  statusEl.hidden = !message;
+  if (message && !isError) {
+    statusClearTimer = window.setTimeout(() => {
+      statusEl.hidden = true;
+    }, 4000);
+  }
+}
+
+function hostLabel(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url || "Clarion";
+  }
 }
 
 function escapeHtml(value) {
@@ -225,11 +261,15 @@ async function refreshIdes(workspacePath) {
   const health = await checkServerHealth();
   if (health === "offline") {
     ideBar.innerHTML = '<span class="ide-chip">Server offline — is :4317 running?</span>';
+    ideStatusEl.textContent = "Server offline";
+    ideStatusEl.classList.remove("ok");
     return [];
   }
   if (health === "outdated") {
     ideBar.innerHTML =
       '<span class="ide-chip">Server outdated — rebuild & restart Oryntra</span>';
+    ideStatusEl.textContent = "Server outdated";
+    ideStatusEl.classList.remove("ok");
     return [];
   }
 
@@ -245,8 +285,18 @@ async function refreshIdes(workspacePath) {
   }
   const data = await res.json();
   const ides = data.ides ?? [];
+  const connectedProviders = new Set(
+    ides
+      .filter((ide) => ide.connected && ide.source !== "extension")
+      .map((ide) => ide.provider),
+  );
+  const visible = ides.filter((ide) => {
+    if (ide.source === "extension") return false;
+    if (ide.source === "probe" && connectedProviders.has(ide.provider)) return false;
+    return true;
+  });
   ideBar.innerHTML = "";
-  for (const ide of ides) {
+  for (const ide of visible) {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = `ide-chip${ide.connected ? " connected" : ""}${ide.provider === selected ? " selected" : ""}`;
@@ -258,8 +308,22 @@ async function refreshIdes(workspacePath) {
     });
     ideBar.appendChild(chip);
   }
-  if (ides.length === 0) {
+  if (visible.length === 0) {
     ideBar.innerHTML = '<span class="ide-chip">No IDEs detected</span>';
+  }
+  const preferred =
+    visible.find((ide) => ide.provider === selected && ide.connected) ||
+    visible.find((ide) => ide.provider === selected) ||
+    visible.find((ide) => ide.connected);
+  if (preferred?.connected) {
+    ideStatusEl.textContent = preferred.label;
+    ideStatusEl.classList.add("ok");
+  } else if (preferred) {
+    ideStatusEl.textContent = `${preferred.label} offline`;
+    ideStatusEl.classList.remove("ok");
+  } else {
+    ideStatusEl.textContent = "No IDE connected";
+    ideStatusEl.classList.remove("ok");
   }
   return ides;
 }
@@ -307,15 +371,30 @@ function renderChat() {
     chatStream.scrollHeight - chatStream.scrollTop - chatStream.clientHeight < 80;
 
   if (state.messages.length === 0) {
-    chatStream.innerHTML =
-      '<p class="hint">Click Clarion, then describe what should change.</p>';
+    chatStream.innerHTML =       state.factoryWo
+        ? state.factoryAgent || state.factoryAddressedTo
+          ? `<p class="hint">Send talks to Oryntra. Post note steers ${escapeHtml(
+              state.factoryAddressedTo || state.factoryAgent,
+            )} on ${escapeHtml(state.factoryWo)} without interrupting this pass.</p>`
+          : `<p class="hint">Queued ${escapeHtml(
+              state.factoryWo,
+            )} — waiting for an idle factory runner (${escapeHtml(
+              runnerListPhrase(),
+            )}).</p>`
+        : '<p class="hint">Click Clarion, then type below.</p>';
+    updateComposerEnabled();
     return;
   }
 
   chatStream.innerHTML = state.messages
     .map((message) => {
       const proposal = pendingArtifactForMessage(message);
-      let html = `<div class="msg msg-${message.role}">${formatMessageHtml(message.content)}</div>`;
+      const noteClass = message.channel === "factory_note" ? " msg-note" : "";
+      const channel =
+        message.channel === "factory_note"
+          ? '<span class="msg-channel">WO note</span>'
+          : "";
+      let html = `<div class="msg msg-${message.role}${noteClass}">${channel}${formatMessageHtml(message.content)}</div>`;
       if (proposal) {
         const summary = escapeHtml(
           proposal.expectedBehavior || proposal.summary || proposal.title || "Proposed change",
@@ -327,10 +406,7 @@ function renderChat() {
             <button type="button" data-approve="${proposal.id}" data-status="rejected">Not quite</button>
           </div>
         </div>`;
-      } else if (
-        message.role === "agent" &&
-        message.artifactId
-      ) {
+      } else if (message.role === "agent" && message.artifactId) {
         const artifact = state.artifacts.find((a) => a.id === message.artifactId);
         if (artifact?.status === "approved" && !artifact.factoryWoId) {
           html += `<div class="proposal">
@@ -346,10 +422,25 @@ function renderChat() {
     .join("");
 
   if (nearBottom) chatStream.scrollTop = chatStream.scrollHeight;
+  updateComposerEnabled();
 }
 
 function updateComposerEnabled() {
-  sendBtn.disabled = state.submitting || state.listening || !feedbackEl.value.trim();
+  const empty = !feedbackEl.value.trim();
+  sendBtn.disabled = state.submitting || state.listening || empty;
+  if (noteBtn) {
+    noteBtn.disabled =
+      state.submitting || state.listening || empty || !state.factoryWo;
+  }
+  if (clearBtn) {
+    clearBtn.disabled =
+      state.submitting ||
+      state.listening ||
+      !state.sessionId ||
+      (state.messages.length === 0 &&
+        state.artifacts.length === 0 &&
+        !state.factoryWo);
+  }
   snapBtn.disabled = state.snapping || !state.sessionId;
   micBtn.disabled = state.listening || !state.sessionId;
 }
@@ -378,9 +469,9 @@ function showReviewUi(sessionId, appLabel) {
   state.sessionId = sessionId;
   composer.hidden = false;
   modeBar.hidden = false;
-  routeRow.hidden = false;
   factoryStrip.hidden = false;
-  metaEl.textContent = appLabel || "extension mode";
+  metaEl.textContent = appLabel || "Clarion";
+  metaEl.title = appLabel || "";
   updateComposerEnabled();
 }
 
@@ -397,18 +488,20 @@ async function refreshBrowserState() {
 
 function applyBrowserState(browserState) {
   if (!browserState) return;
-  routeRow.hidden = false;
-  routePill.textContent = shortRoute(browserState.route || "/");
+  const route = shortRoute(browserState.route || "/");
   const label =
     browserState.lockedElement?.name ||
     browserState.lastClickedElement?.name ||
     browserState.elementUnderPointer?.name;
+  routePill.textContent = route;
   if (label) {
     clickedPill.hidden = false;
     clickedPill.textContent = label;
+    clickedPill.title = label;
   } else {
     clickedPill.hidden = true;
   }
+  routeRow.hidden = route === "/" && !label;
 }
 
 function upsertArtifact(artifact) {
@@ -439,6 +532,13 @@ function handleWsMessage(data) {
       state.messages = mergeMessages(state.messages, [data.message]);
       renderChat();
       break;
+    case "chat_cleared":
+      state.messages = [];
+      state.artifacts = [];
+      implementBanner.classList.remove("show");
+      implementBanner.textContent = "";
+      renderChat();
+      break;
     case "artifact":
       upsertArtifact(data.artifact);
       break;
@@ -450,6 +550,14 @@ function handleWsMessage(data) {
       break;
     case "factory_binding":
       applyFactoryBinding(data);
+      break;
+    case "factory_relay_status":
+      setStatus(
+        data.ok
+          ? "Note posted to the factory thread."
+          : data.error || "Note failed to reach the factory thread.",
+        !data.ok,
+      );
       break;
     case "implement_status":
       if (data.message) {
@@ -507,39 +615,252 @@ function connectSocket() {
 }
 
 function applyFactoryBinding(binding) {
-  state.factoryWo = binding.factoryWo ?? null;
+  const nextWo = binding.factoryWo ?? null;
+  if (nextWo !== state.factoryWo) {
+    state.factoryStatus = null;
+    state.factoryStep = null;
+    state.factoryPrUrl = null;
+  }
+  state.factoryWo = nextWo;
   state.factoryAgent = binding.factoryAgent ?? null;
   state.factoryAddressedTo = binding.factoryAddressedTo ?? null;
-  if (state.factoryWo) {
-    const who = state.factoryAddressedTo || state.factoryAgent;
-    factoryLabel.textContent = who
-      ? `${who} · ${state.factoryWo}`
-      : state.factoryWo;
-    factoryUnbindBtn.hidden = false;
+  if (binding.factoryParticipants) {
+    state.factoryParticipants = binding.factoryParticipants;
+  }
+  updateComposerLane();
+}
+
+function displayAgentName(name) {
+  return String(name || "").replace(/-runner$/i, "");
+}
+
+function onlineRunnerNames() {
+  const names = state.factoryAgents
+    .filter((agent) => agent.daemonLoaded || agent.cliDetected)
+    .map((agent) => displayAgentName(agent.name))
+    .filter(Boolean);
+  return [...new Set(names)];
+}
+
+function runnerListPhrase() {
+  const names = onlineRunnerNames();
+  return names.length ? names.join(", ") : "claude, cursor, codex, or gemini";
+}
+
+function factoryStatusPhrase() {
+  const raw = (state.factoryStatus || "").replace(/_/g, " ");
+  if (raw === "in progress") return "in progress";
+  if (raw === "awaiting human") return "awaiting review";
+  if (raw === "awaiting commit") return "awaiting commit";
+  if (raw === "claimed") return "claimed";
+  return raw || "queued";
+}
+
+function announceFactoryProgress(prevStatus, prevPr, next) {
+  if (!state.factoryWo) return;
+  const nextStatus = next?.status || null;
+  const nextAgent = displayAgentName(next?.agent || "");
+  const nextPr = next?.prUrl || "";
+  const wasUnclaimed = !prevStatus || prevStatus === "queued";
+  if (nextAgent && nextStatus && nextStatus !== "queued" && wasUnclaimed) {
+    setStatus(`${state.factoryWo} picked up by ${nextAgent}.`);
+    return;
+  }
+  if (prevStatus === "claimed" && nextStatus === "in_progress") {
+    setStatus(
+      `${state.factoryWo} is in progress${
+        next?.step ? ` · ${next.step}` : ""
+      }.`,
+    );
+    return;
+  }
+  if (!prevPr && nextPr) {
+    setStatus(`${state.factoryWo} opened a PR.`);
+    return;
+  }
+  if (nextStatus === "awaiting_human" && prevStatus !== "awaiting_human") {
+    setStatus(`${state.factoryWo} is awaiting your review.`);
+  }
+}
+
+function updateComposerLane() {
+  const bound = Boolean(state.factoryWo);
+  if (noteBtn) noteBtn.hidden = !bound;
+  if (bound) {
+    const who = displayAgentName(
+      state.factoryAddressedTo || state.factoryAgent,
+    );
+    const claimed = Boolean(
+      who && state.factoryStatus && state.factoryStatus !== "queued",
+    );
+    factoryLabel.textContent = claimed
+      ? `${state.factoryWo} · ${who}`
+      : `${state.factoryWo} · queued`;
+    if (factoryDetail) {
+      factoryDetail.textContent = claimed
+        ? `${factoryStatusPhrase()}${
+            state.factoryStep ? ` · ${state.factoryStep}` : ""
+          }. Notes won't interrupt.`
+        : `Waiting for an idle runner (${runnerListPhrase()}).`;
+    }
+    if (factoryPr) {
+      if (state.factoryPrUrl) {
+        factoryPr.hidden = false;
+        factoryPr.href = state.factoryPrUrl;
+      } else {
+        factoryPr.hidden = true;
+        factoryPr.removeAttribute("href");
+      }
+    }
+    boundBar.hidden = false;
     factoryBind.hidden = true;
+    composerLane.textContent = claimed
+      ? `Send talks to Oryntra. Post note steers ${who} on ${state.factoryWo} after this pass.`
+      : `Queued ${state.factoryWo}. Any idle factory runner can claim it — not only Claude.`;
+    composerLane.classList.add("show");
+    feedbackEl.placeholder = claimed
+      ? "Talking to Oryntra. Use Post note to steer the WO."
+      : "Talking to Oryntra. No runner has claimed this WO yet.";
+    sendBtn.title = "Talk to Oryntra (does not post to the factory thread)";
+    noteBtn.title = claimed
+      ? `Post to ${state.factoryWo} for ${who}. They finish this pass first.`
+      : `Post to ${state.factoryWo}. No runner has claimed it yet.`;
+    const awaiting = state.factoryStatus === "awaiting_human";
+    if (factoryApproveBtn) factoryApproveBtn.hidden = !awaiting;
+    if (factoryRejectBtn) factoryRejectBtn.hidden = !awaiting;
   } else {
-    factoryLabel.textContent = "Scratch review — bind a WO to relay into factory";
-    factoryUnbindBtn.hidden = true;
+    factoryLabel.textContent = "";
+    if (factoryDetail) factoryDetail.textContent = "";
+    if (factoryPr) {
+      factoryPr.hidden = true;
+      factoryPr.removeAttribute("href");
+    }
+    boundBar.hidden = true;
     factoryBind.hidden = false;
+    composerLane.textContent = "";
+    composerLane.classList.remove("show");
+    feedbackEl.placeholder = "What should change?";
+    sendBtn.title = "";
+    noteBtn.title = "";
+    if (factoryApproveBtn) factoryApproveBtn.hidden = true;
+    if (factoryRejectBtn) factoryRejectBtn.hidden = true;
+  }
+  renderAddressChips();
+  updateComposerEnabled();
+  if (state.messages.length === 0) renderChat();
+}
+
+function renderAddressChips() {
+  addressChips.innerHTML = "";
+  if (!state.factoryWo) {
+    addressChips.classList.remove("show");
+    return;
+  }
+  const seen = new Set();
+  const roster = [];
+  if (state.factoryAgent) {
+    roster.push({ name: state.factoryAgent, role: "implementer" });
+    seen.add(state.factoryAgent);
+  }
+  for (const person of state.factoryParticipants) {
+    if (!person?.name || seen.has(person.name)) continue;
+    seen.add(person.name);
+    roster.push(person);
+  }
+  if (roster.length === 0) {
+    addressChips.classList.remove("show");
+    return;
+  }
+  const selected = state.factoryAddressedTo || state.factoryAgent;
+  for (const person of roster) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = `address-chip${selected === person.name ? " active" : ""}`;
+    btn.textContent = person.name;
+    btn.addEventListener("click", () => void addressFactoryAgent(person.name));
+    addressChips.appendChild(btn);
+  }
+  addressChips.classList.add("show");
+}
+
+async function addressFactoryAgent(agent) {
+  if (!state.sessionId) return;
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/sessions/${state.sessionId}/factory-address`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agent }),
+      },
+    );
+    if (!res.ok) throw new Error("Could not address factory agent");
+    applyFactoryBinding(await res.json());
+  } catch (err) {
+    setStatus(err.message || "Could not address factory agent", true);
   }
 }
 
 async function refreshFactory() {
   if (!state.sessionId) return;
   try {
-    const [sessionRes, liveRes] = await Promise.all([
+    const [sessionRes, liveRes, agentsRes] = await Promise.all([
       fetch(`${API_BASE}/api/sessions/${state.sessionId}`),
       fetch(`${API_BASE}/api/factory/live-work`),
+      fetch(`${API_BASE}/api/factory/agents`),
     ]);
     if (sessionRes.ok) {
       const session = await sessionRes.json();
       applyFactoryBinding(session);
     }
-    if (!liveRes.ok) return;
+    if (state.sessionId && state.factoryWo) {
+      const ctxRes = await fetch(
+        `${API_BASE}/api/sessions/${state.sessionId}/factory-context`,
+      );
+      if (ctxRes.ok) {
+        const ctx = await ctxRes.json();
+        state.factoryParticipants = ctx.participants || [];
+        renderAddressChips();
+      }
+    } else {
+      state.factoryParticipants = [];
+      renderAddressChips();
+    }
+    if (agentsRes.ok) {
+      state.factoryAgents = await agentsRes.json();
+    }
+    if (!liveRes.ok) {
+      updateComposerLane();
+      return;
+    }
     const live = await liveRes.json();
+    const boundLive = live.find((item) => item.wo && item.wo === state.factoryWo);
+    const nextStatus = boundLive?.status || null;
+    const nextAgent = boundLive?.agent || null;
+    announceFactoryProgress(
+      state.factoryStatus,
+      state.factoryPrUrl,
+      boundLive || null,
+    );
+    state.factoryStatus = nextStatus;
+    state.factoryStep = boundLive?.step || null;
+    state.factoryPrUrl = boundLive?.prUrl || null;
+    if (nextAgent) state.factoryAgent = nextAgent;
+    updateComposerLane();
     factoryLive.innerHTML = "";
-    for (const item of live) {
-      if (item.wo && item.wo === state.factoryWo) continue;
+    const awaiting = live.filter((item) => item.status === "awaiting_human");
+    const inflight = live.filter(
+      (item) => item.status !== "awaiting_human" && item.wo !== state.factoryWo,
+    );
+    for (const item of awaiting) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = `Review ${item.agent || "unclaimed"} · ${item.wo}`;
+      btn.title = "Awaiting human verdict";
+      btn.addEventListener("click", () => void bindFactoryWo(item.wo));
+      factoryLive.appendChild(btn);
+    }
+    for (const item of inflight) {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.textContent = `${item.agent || "unclaimed"} · ${item.wo}`;
@@ -563,14 +884,46 @@ async function bindFactoryWo(wo) {
     if (!res.ok) throw new Error("Bind failed");
     applyFactoryBinding(await res.json());
     factoryWoInput.value = "";
+    await refreshFactory();
     setStatus(
       wo
-        ? `Bound to ${wo}. Clicks and feedback relay to that factory thread.`
+        ? state.factoryStatus === "awaiting_human"
+          ? `Bound to ${wo} for validation. Inspect with Send, Post note for evidence, then Approve or Reject.`
+          : state.factoryAgent
+            ? `Bound to ${wo}. Send talks to Oryntra. Post note steers ${displayAgentName(state.factoryAgent)} without interrupting.`
+            : `Bound to ${wo}. Queued — any idle runner (${runnerListPhrase()}) can claim it.`
         : "Unbound — scratch review. Approve then Send to Factory to queue a new WO.",
     );
-    await refreshFactory();
   } catch (err) {
     setStatus(err.message || "Could not bind factory WO", true);
+  }
+}
+
+async function submitFactoryVerdict(verdict) {
+  if (!state.sessionId || !state.factoryWo) return;
+  let notes = "";
+  if (verdict === "reject") {
+    notes = window.prompt("Why reject? This is posted to the WO thread.") ?? "";
+    if (!notes.trim()) {
+      setStatus("A reject note is required.", true);
+      return;
+    }
+  }
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/sessions/${state.sessionId}/factory-validations/${encodeURIComponent(state.factoryWo)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verdict, notes: notes.trim() }),
+      },
+    );
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || "Verdict failed");
+    setStatus(verdict === "approve" ? `Approved ${state.factoryWo}.` : `Rejected ${state.factoryWo}.`);
+    await refreshFactory();
+  } catch (err) {
+    setStatus(err.message || "Verdict failed", true);
   }
 }
 
@@ -582,11 +935,18 @@ async function exportToFactory(artifactId) {
       { method: "POST" },
     );
     const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(body.error || "Send to Factory failed");
+    if (!res.ok || body.ok === false) {
+      throw new Error(body.error || "Send to Factory failed");
+    }
+    if (!body.woId) {
+      throw new Error(body.error || "Factory did not return a WO id");
+    }
     if (body.artifact) upsertArtifact(body.artifact);
-    if (body.woId) applyFactoryBinding({ factoryWo: body.woId, ...body });
-    setStatus(body.woId ? `Queued ${body.woId} on the factory.` : "Sent to Factory.");
+    applyFactoryBinding({ factoryWo: body.woId, ...body });
     await refreshFactory();
+    setStatus(
+      `Queued ${body.woId} on the factory. Any idle runner (${runnerListPhrase()}) can claim it.`,
+    );
   } catch (err) {
     setStatus(err.message || "Send to Factory failed", true);
   }
@@ -635,12 +995,16 @@ async function captureSnap() {
   }
 }
 
-async function sendFeedback() {
+async function sendFeedback(destination = "review") {
   const transcript = feedbackEl.value.trim();
   if (!state.sessionId || !transcript || state.submitting) return;
+  if (destination === "factory_note" && !state.factoryWo) {
+    setStatus("Bind a factory WO before posting a note.", true);
+    return;
+  }
   state.submitting = true;
   updateComposerEnabled();
-  setStatus("Sending…");
+  setStatus(destination === "factory_note" ? "Posting note…" : "Sending…");
   try {
     const res = await fetch(`${API_BASE}/api/sessions/${state.sessionId}/feedback`, {
       method: "POST",
@@ -651,6 +1015,13 @@ async function sendFeedback() {
         reviewMode: state.reviewMode,
         screenshotId: state.stagedSnap?.screenshotId,
         accessibilitySnapshotId: state.stagedSnap?.accessibilitySnapshotId,
+        destination,
+        ...(destination === "factory_note"
+          ? {
+              addressedTo:
+                state.factoryAddressedTo || state.factoryAgent || null,
+            }
+          : {}),
       }),
     });
     if (!res.ok) {
@@ -665,12 +1036,42 @@ async function sendFeedback() {
     feedbackEl.value = "";
     state.stagedSnap = null;
     renderSnapPreview();
-    setStatus("Sent. Stay on Clarion — Cursor replies here.");
+    setStatus(destination === "factory_note" ? "Note posted." : "Sent.");
   } catch (err) {
     setStatus(err.message || "Feedback failed", true);
   } finally {
     state.submitting = false;
     updateComposerEnabled();
+  }
+}
+
+async function clearChat() {
+  if (!state.sessionId) return;
+  if (
+    state.messages.length === 0 &&
+    state.artifacts.length === 0 &&
+    !state.factoryWo
+  ) {
+    return;
+  }
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/sessions/${state.sessionId}/chat/clear`,
+      { method: "POST" },
+    );
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || "Could not clear chat");
+    }
+    state.messages = [];
+    state.artifacts = [];
+    implementBanner.classList.remove("show");
+    implementBanner.textContent = "";
+    applyFactoryBinding({ factoryWo: null });
+    renderChat();
+    setStatus("Review cleared — describe a change to start over.");
+  } catch (err) {
+    setStatus(err.message || "Could not clear chat", true);
   }
 }
 
@@ -682,7 +1083,7 @@ async function setArtifactStatus(artifactId, status) {
       {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, cursorAgent: "continue" }),
+        body: JSON.stringify({ status }),
       },
     );
     if (!res.ok) {
@@ -691,7 +1092,11 @@ async function setArtifactStatus(artifactId, status) {
     }
     const data = await res.json();
     if (data.artifact) upsertArtifact(data.artifact);
-    setStatus(status === "approved" ? "Approved — Cursor can implement." : "Rejected.");
+    setStatus(
+      status === "approved"
+        ? "Approved — Send to Factory to queue a WO. Cursor is not started."
+        : "Rejected.",
+    );
   } catch (err) {
     setStatus(err.message || "Update failed", true);
   }
@@ -799,12 +1204,12 @@ async function ensureSession() {
     await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
   }
 
-  await connectChat(sessionId, `${appUrl} · extension mode`);
+  await connectChat(sessionId, hostLabel(appUrl));
   await refreshIdes(workspacePath);
   setStatus(
     injected
-      ? "Stay on Clarion. Click the UI, then type here."
-      : "Refresh Clarion once (Cmd+R), then click the UI and type here.",
+      ? "Ready — click Clarion, then type below."
+      : "Refresh Clarion once (Cmd+R), then type below.",
   );
   return sessionId;
 }
@@ -839,16 +1244,20 @@ openStudioBtn.addEventListener("click", () => {
   })();
 });
 
+noteBtn.addEventListener("click", () => {
+  void sendFeedback("factory_note");
+});
+
 composer.addEventListener("submit", (event) => {
   event.preventDefault();
-  void sendFeedback();
+  void sendFeedback("review");
 });
 
 feedbackEl.addEventListener("input", updateComposerEnabled);
 feedbackEl.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
     event.preventDefault();
-    void sendFeedback();
+    void sendFeedback("review");
   }
 });
 
@@ -857,6 +1266,9 @@ snapBtn.addEventListener("click", () => {
 });
 
 micBtn.addEventListener("click", startSpeechInput);
+clearBtn?.addEventListener("click", () => {
+  void clearChat();
+});
 
 modeBar.addEventListener("click", (event) => {
   const btn = event.target.closest("button[data-mode]");
@@ -895,6 +1307,14 @@ factoryUnbindBtn.addEventListener("click", () => {
   void bindFactoryWo(null);
 });
 
+factoryApproveBtn?.addEventListener("click", () => {
+  void submitFactoryVerdict("approve");
+});
+
+factoryRejectBtn?.addEventListener("click", () => {
+  void submitFactoryVerdict("reject");
+});
+
 void loadSettings().then(async (settings) => {
   const workspacePath = settings.workspacePath?.trim() || DEFAULT_WORKSPACE;
   workspacePathEl.value = workspacePath;
@@ -906,14 +1326,9 @@ void loadSettings().then(async (settings) => {
   await pingFactoryHeartbeat({ ...settings, workspacePath });
   await refreshIdes(workspacePath);
   if (settings.sessionId) {
-    const appLabel = settings.appUrl
-      ? `${originOf(settings.appUrl)} · saved session`
-      : "Saved session";
-    await connectChat(settings.sessionId, appLabel);
+    await connectChat(settings.sessionId, hostLabel(settings.appUrl));
     const tab = settings.appUrl ? await findAppTab(settings.appUrl) : null;
     if (tab) await bindAppTab(tab, settings.sessionId, settings.appUrl);
-    setStatus("Stay on Clarion. Click the UI, then type here.");
     return;
   }
-  setStatus("Stay on Clarion, then Start review. Chat stays in this panel.");
 });

@@ -1,18 +1,24 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import {
+  createFactoryWo,
   detectActiveWo,
   factoryThreadAsContext,
   getThreadMessages,
   listFactoryAgents,
   listLiveWork,
+  listValidationQueue,
   postThreadMessage,
+  resetFactoryAuthCache,
+  submitFactoryValidation,
 } from "./client.js";
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  delete process.env.ORYNTRA_FACTORY_SECRET;
+  resetFactoryAuthCache();
 });
 
 function mockFetch(handler: (url: string, init?: RequestInit) => Response) {
@@ -171,6 +177,97 @@ test("listLiveWork returns only live WOs with the claiming agent, in_progress fi
   assert.equal(live[0]?.agent, "cursor");
   assert.equal(live[1]?.wo, "WO-2");
   assert.equal(live[1]?.agent, "claude");
+});
+
+test("createFactoryWo sends the factory bearer token", async () => {
+  process.env.ORYNTRA_FACTORY_SECRET = "factory-secret";
+  resetFactoryAuthCache();
+  mockFetch((_url, init) => {
+    const headers = new Headers(init?.headers);
+    assert.equal(headers.get("Authorization"), "Bearer factory-secret");
+    return Response.json({ wo_number: 42, url: "http://example/WO-42" });
+  });
+  const result = await createFactoryWo({
+    title: "hover contrast",
+    problem: "rows flash white",
+    whatToBuild: "fix hover",
+    acceptanceCriteria: ["a", "b", "c"],
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.woId, "WO-42");
+});
+
+test("createFactoryWo surfaces factory 401 instead of pretending success", async () => {
+  process.env.ORYNTRA_FACTORY_SECRET = "bad";
+  resetFactoryAuthCache();
+  mockFetch(() => Response.json({ detail: "Unauthorized" }, { status: 401 }));
+  const result = await createFactoryWo({
+    title: "hover contrast",
+    problem: "rows flash white",
+    whatToBuild: "fix hover",
+    acceptanceCriteria: ["a", "b", "c"],
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? "", /Unauthorized/);
+});
+
+test("listValidationQueue returns awaiting_human WOs and factoryOk", async () => {
+  mockFetch(() =>
+    Response.json({
+      "WO-1": { wo: "WO-1", status: "in_progress", agent: "cursor" },
+      "WO-2": {
+        wo: "WO-2",
+        status: "awaiting_human",
+        agent: "claude",
+        slug: "drawer",
+        claimed_at: "2026-09-12T00:00:00Z",
+      },
+    }),
+  );
+  const queue = await listValidationQueue();
+  assert.equal(queue.factoryOk, true);
+  assert.equal(queue.items.length, 1);
+  assert.equal(queue.items[0]?.wo, "WO-2");
+  assert.equal(queue.items[0]?.agent, "claude");
+});
+
+test("listValidationQueue marks factory offline instead of throwing", async () => {
+  mockFetch(() => {
+    throw new TypeError("fetch failed");
+  });
+  const queue = await listValidationQueue();
+  assert.equal(queue.factoryOk, false);
+  assert.deepEqual(queue.items, []);
+});
+
+test("submitFactoryValidation posts decided_by and notes to approve", async () => {
+  mockFetch((url, init) => {
+    assert.match(url, /\/api\/validations\/WO-2\/approve$/);
+    const body = JSON.parse(String(init?.body ?? "{}")) as {
+      decided_by?: string;
+      notes?: string;
+    };
+    assert.equal(body.decided_by, "steve");
+    assert.equal(body.notes, "looks good");
+    return Response.json({ ok: true });
+  });
+  const result = await submitFactoryValidation("WO-2", "approve", {
+    decidedBy: "steve",
+    notes: "looks good",
+  });
+  assert.equal(result.ok, true);
+});
+
+test("submitFactoryValidation returns ok:false when the factory is unreachable", async () => {
+  mockFetch(() => {
+    throw new TypeError("fetch failed");
+  });
+  const result = await submitFactoryValidation("WO-2", "reject", {
+    decidedBy: "steve",
+    notes: "drawer still wrong",
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? "", /fetch failed/);
 });
 
 test("listFactoryAgents returns [] when the factory is unreachable", async () => {

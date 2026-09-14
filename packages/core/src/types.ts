@@ -285,6 +285,8 @@ export type AgentThread = {
   cursorChatId?: string;
 };
 
+export type FeedbackDestination = "review" | "factory_note";
+
 export type ChatMessage = {
   id: string;
   sessionId: string;
@@ -295,11 +297,14 @@ export type ChatMessage = {
   artifactId?: string;
   /** Agent conversation thread (Cursor-style multi-chat) */
   agentThreadId?: string;
+  /** review = Oryntra facilitator; factory_note = posted to the bound WO thread */
+  channel?: FeedbackDestination;
   timestamp: string;
 };
 
 export type ServerMessage =
   | { type: "pong" }
+  | { type: "chat_cleared" }
   | { type: "browser_event"; event: BrowserEvent }
   | { type: "browser_state"; state: BrowserState }
   | { type: "feedback_moment"; moment: FeedbackMoment }
@@ -353,7 +358,12 @@ export type SubmitFeedbackRequest = {
   /** Reuse capture from manual Snap (FEAT-019) */
   screenshotId?: string;
   accessibilitySnapshotId?: string;
-  /** Factory thread participant to address (claiming agent or reviewer). */
+  /**
+   * `review` (default) talks to Oryntra. `factory_note` posts to the bound WO
+   * thread and does not run the facilitator.
+   */
+  destination?: FeedbackDestination;
+  /** Factory thread participant to address. Used only for `factory_note`. */
   addressedTo?: string | null;
 };
 

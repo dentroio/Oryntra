@@ -58,7 +58,11 @@ test("factory thread is injected as memory when the session is bound to an agent
   assert.equal(ctx.hasConversationContext, true);
   assert.match(ctx.effectiveTranscript, /WO-1080/);
   assert.match(ctx.effectiveTranscript, /cursor/);
-  assert.match(ctx.effectiveTranscript, /Address this correction to security/);
+  assert.match(ctx.effectiveTranscript, /review facilitator/);
+  assert.doesNotMatch(
+    ctx.effectiveTranscript,
+    /Address this correction to security/,
+  );
   assert.match(ctx.effectiveTranscript, /Factory agent thread/);
   assert.match(ctx.effectiveTranscript, /switching View Details/);
   assert.match(ctx.effectiveTranscript, /still loses filters/);

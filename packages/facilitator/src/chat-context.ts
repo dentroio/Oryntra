@@ -92,13 +92,10 @@ export function buildEffectiveTranscript(input: {
   const parts: string[] = [];
   if (input.factoryBinding?.wo) {
     const agent = input.factoryBinding.agent
-      ? ` (agent ${input.factoryBinding.agent})`
-      : "";
-    const addressed = input.factoryBinding.addressedTo
-      ? ` Address this correction to ${input.factoryBinding.addressedTo}.`
+      ? ` (implementer ${input.factoryBinding.agent})`
       : "";
     parts.push(
-      `This review continues factory work ${input.factoryBinding.wo}${agent}.${addressed} Do not start over — use the factory thread below as memory.`,
+      `This review continues factory work ${input.factoryBinding.wo}${agent}. You are Oryntra's review facilitator, not the factory implementer. Use the factory thread below as memory only — do not speak as that agent. The human is talking to you. Do not start over.`,
       "",
     );
   }

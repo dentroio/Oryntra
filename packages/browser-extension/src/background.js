@@ -1,8 +1,10 @@
 const API_BASE = "http://127.0.0.1:4317";
 const CAPTURE_POLL_MS = 300;
+const CAPTURE_POLL_MAX_MS = 15_000;
 
 let activeSessionId = null;
 let activeTabId = null;
+let capturePollDelayMs = CAPTURE_POLL_MS;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -47,35 +49,61 @@ async function loadBinding() {
 }
 
 async function pollPendingCapture() {
-  await loadBinding();
-  if (!activeSessionId || activeTabId == null) return;
-
-  const pendingRes = await fetch(
-    `${API_BASE}/api/sessions/${activeSessionId}/bridge-capture/pending`,
-  );
-  if (!pendingRes.ok) return;
-  const pending = await pendingRes.json();
-  if (!pending.screenshotId && !pending.snapshotId) return;
-
-  const body = {};
-  if (pending.screenshotId) {
-    const pngBase64 = await captureTab(activeTabId);
-    if (pngBase64) {
-      body.screenshotId = pending.screenshotId;
-      body.pngBase64 = pngBase64;
+  try {
+    await loadBinding();
+    if (!activeSessionId || activeTabId == null) {
+      capturePollDelayMs = CAPTURE_POLL_MS;
+      return;
     }
-  }
-  if (pending.snapshotId) {
-    body.snapshotId = pending.snapshotId;
-    body.snapshotText = await requestSnapshotFromTab(activeTabId);
-  }
-  if (!body.screenshotId && !body.snapshotId) return;
 
-  await fetch(`${API_BASE}/api/sessions/${activeSessionId}/bridge-capture`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+    const pendingRes = await fetch(
+      `${API_BASE}/api/sessions/${activeSessionId}/bridge-capture/pending`,
+      { signal: AbortSignal.timeout(2000) },
+    );
+    if (!pendingRes.ok) {
+      capturePollDelayMs = CAPTURE_POLL_MS;
+      return;
+    }
+    const pending = await pendingRes.json();
+    if (!pending.screenshotId && !pending.snapshotId) {
+      capturePollDelayMs = CAPTURE_POLL_MS;
+      return;
+    }
+
+    const body = {};
+    if (pending.screenshotId) {
+      const pngBase64 = await captureTab(activeTabId);
+      if (pngBase64) {
+        body.screenshotId = pending.screenshotId;
+        body.pngBase64 = pngBase64;
+      }
+    }
+    if (pending.snapshotId) {
+      body.snapshotId = pending.snapshotId;
+      body.snapshotText = await requestSnapshotFromTab(activeTabId);
+    }
+    if (!body.screenshotId && !body.snapshotId) {
+      capturePollDelayMs = CAPTURE_POLL_MS;
+      return;
+    }
+
+    await fetch(`${API_BASE}/api/sessions/${activeSessionId}/bridge-capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5000),
+    });
+    capturePollDelayMs = CAPTURE_POLL_MS;
+  } catch {
+    // Backend down or session gone — do not surface as an uncaught extension error.
+    capturePollDelayMs = Math.min(capturePollDelayMs * 2, CAPTURE_POLL_MAX_MS);
+  }
+}
+
+function scheduleCapturePoll() {
+  setTimeout(() => {
+    void pollPendingCapture().finally(scheduleCapturePoll);
+  }, capturePollDelayMs);
 }
 
 async function captureTab(tabId) {
@@ -142,9 +170,7 @@ async function extensionHeartbeat() {
   }).catch(() => {});
 }
 
-setInterval(() => {
-  void pollPendingCapture();
-}, CAPTURE_POLL_MS);
+scheduleCapturePoll();
 
 setInterval(() => {
   void extensionHeartbeat();

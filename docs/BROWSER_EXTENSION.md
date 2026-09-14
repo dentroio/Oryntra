@@ -106,18 +106,23 @@ Same backend pipeline as embedded bridge mode (`BridgeSession` + `/bridge-events
 
 ## Clarion workflow
 
-```bash
-# Terminal 1 — backend
-docker compose up -d
+Oryntra runs as a **local Node daemon** on `:4317`. It is not packaged in Docker with Clarion or the agentic factory. See [FACTORY.md](./FACTORY.md).
 
-# Terminal 2 — frontend
+```bash
+# Terminal 1 — Clarion app stack (Clarion’s own docker compose / DB if that repo uses it)
+docker compose up -d   # Clarion only — not Oryntra
+
+# Terminal 2 — Clarion frontend
 cd clarion && npm run dev
 
-# Terminal 3 — Oryntra
+# Terminal 3 — Oryntra local backend (separate from factory)
 cd oryntra && npm run build && npm run dev
+
+# Optional — agentic-factory status API on :8099 (separate process; see that repo)
 
 # Browser — extension side panel → Start review
 # Cursor — MCP enabled with ORYNTRA_WORKSPACE pointing at clarion
+# Factory WOs — bind / Send to Factory in the side panel (docs/FACTORY.md)
 ```
 
 ## Permissions
@@ -130,5 +135,7 @@ cd oryntra && npm run build && npm run dev
 ## See also
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) §5 Browser Interaction Model
+- [FACTORY.md](./FACTORY.md) — local daemon runtime; Oryntra ↔ agentic-factory
+- [LEGACY_EXTENSION.md](./LEGACY_EXTENSION.md) — archived WO-1011 annotation branch
 - [MCP_SETUP.md](./MCP_SETUP.md)
 - [CURSOR_REVIEW.md](./CURSOR_REVIEW.md)

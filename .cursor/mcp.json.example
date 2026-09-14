@@ -8,7 +8,8 @@
       "env": {
         "ORYNTRA_URL": "http://127.0.0.1:4317",
         "ORYNTRA_WORKSPACE": "/absolute/path/to/your/project",
-        "ORYNTRA_IDE": "cursor"
+        "ORYNTRA_IDE": "cursor",
+        "ORYNTRA_MCP_CLIENT_ID": "mcp:cursor"
       }
     }
   }
