@@ -103,6 +103,21 @@ function factoryUrl(override?: string | null): string {
   return override || process.env.ORYNTRA_FACTORY_URL || DEFAULT_FACTORY_URL;
 }
 
+/** Health for the Factory IDE chip — dispatch map responding, not WO contents. */
+export async function probeFactoryReachable(
+  factoryUrlOverride?: string | null,
+  timeoutMs = 1500,
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${factoryUrl(factoryUrlOverride)}/api/factory/dispatch`, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 let cachedFactorySecret: string | undefined;
 
 /** Test hook — do not use in production code. */

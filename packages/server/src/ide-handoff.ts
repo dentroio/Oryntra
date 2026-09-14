@@ -42,10 +42,19 @@ export function buildImplementPrompt(input: {
   ].join(" ");
 }
 
+export function isFactoryExecutionTarget(provider?: IdeProvider | string | null): boolean {
+  return provider === "factory";
+}
+
 export function buildIdeHandoffHint(
   targetIde: IdeProvider,
   connected: boolean,
 ): string {
+  if (isFactoryExecutionTarget(targetIde)) {
+    return connected
+      ? "Approved — Send to Factory to queue a WO. Cursor is not started."
+      : "Approved — factory is unreachable. Start the factory status API, then Send to Factory.";
+  }
   const label = getIdeLabel(targetIde);
   if (connected) {
     return `Approved — ${label} should read .oryntra/implement-request.json and implement the approved changes.`;

@@ -53,7 +53,11 @@ Oryntra does **not** embed or spawn factory runners. It is an HTTP client to the
 | `ORYNTRA_FACTORY_SECRET` | Bearer token for writes (factory `API_SECRET`) |
 | `ORYNTRA_REVIEWER` | Name used as `decided_by` on validation (default `oryntra-reviewer`) |
 
-If the factory is down, review still works; factory panels show offline and bind/export/notes fail until it is reachable.
+If the factory is down, review still works; factory panels show offline and bind/export/notes fail until it is reachable. The **Factory** IDE chip is shown only while `GET {FACTORY_URL}/api/factory/dispatch` responds.
+
+Selecting **Factory** as the preferred execution target means handoff is **Send to Factory**, not MCP. Approve still does not create a WO.
+
+Oryntra does **not** pin exported WOs to the front of the factory queue. Queue order stays the factory PM’s call (`ORDER BY position ASC`; new rows append). Factory pre-dispatch approval (P1 / `REQUIRE_APPROVAL_FOR`) is a separate factory-side gate after the WO exists.
 
 Implementation lives in `packages/server/src/factory/` (client, export, lanes). Deeper factory-side contract: `docs/ORYNTRA_FACTORY_INTEGRATION.md` in the **agentic-factory** repo.
 

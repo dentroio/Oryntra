@@ -86,3 +86,15 @@ test("embedded reviews still auto-implement by default", () => {
     false,
   );
 });
+
+test("factory as preferred IDE never auto-implements", () => {
+  assert.equal(shouldAutoImplementOnApprove({}, "embedded", "factory"), false);
+  assert.equal(
+    shouldAutoImplementOnApprove(
+      { agent: { autoImplementOnApprove: true } },
+      "extension",
+      "factory",
+    ),
+    false,
+  );
+});

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Oryntra Review",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "description": "Single-screen product review for enterprise web apps. Captures spatial feedback from your real browser tab and connects to Cursor, VS Code, and other IDEs.",
   "permissions": ["activeTab", "tabs", "sidePanel", "storage", "scripting"],
   "host_permissions": [
