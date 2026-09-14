@@ -136,5 +136,6 @@ cd oryntra && npm run build && npm run dev
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md) §5 Browser Interaction Model
 - [FACTORY.md](./FACTORY.md) — local daemon runtime; Oryntra ↔ agentic-factory
+- [LEGACY_EXTENSION.md](./LEGACY_EXTENSION.md) — archived WO-1011 annotation branch
 - [MCP_SETUP.md](./MCP_SETUP.md)
 - [CURSOR_REVIEW.md](./CURSOR_REVIEW.md)

@@ -33,6 +33,7 @@ MCP handoff → preferred IDE implements in your workspace
 |----------|-------------|
 | [Architecture & Design Spec (v1.2)](./docs/ARCHITECTURE.md) | Full product architecture, capture modes, multi-IDE registry |
 | [Browser Extension](./docs/BROWSER_EXTENSION.md) | Enterprise single-screen review (recommended) |
+| [Legacy extension (archived)](./docs/LEGACY_EXTENSION.md) | WO-1011 annotation branch — tagged, not merged |
 | [Factory + runtime](./docs/FACTORY.md) | Local daemon model; Oryntra ↔ agentic-factory workflow |
 | [MVP Build Guide](./docs/MVP_BUILD.md) | Implementation brief for Phase 1–3 |
 | [Cursor Review Loop](./docs/CURSOR_REVIEW.md) | IDE agent as facilitator |
